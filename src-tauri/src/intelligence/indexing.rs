@@ -1,6 +1,5 @@
 use dashmap::DashMap;
 use crate::intelligence::symbols::Symbol;
-use std::sync::Arc;
 
 /// A specialized index for fast symbol lookup across the repository.
 pub struct RepositoryIndex {

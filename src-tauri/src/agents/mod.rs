@@ -1,45 +1,45 @@
-use async_trait::async_trait;
-use crate::events::{SharedEventFabric, SystemEvent, EventType};
-use serde_json::json;
-use std::sync::Arc;
-use anyhow::Result;
-use tracing::{info, instrument};
+pub mod types;
+pub mod planning;
+pub mod critique;
+pub mod executor;
 
-#[async_trait]
-pub trait Agent: Send + Sync {
-    fn name(&self) -> &str;
-    async fn execute(&self, fabric: SharedEventFabric, project_id: String, payload: serde_json::Value) -> Result<()>;
+use serde::{Serialize, Deserialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum AgentKind {
+    Architect,
+    Critic,
+    Synthesizer,
+    Repository,
+    Repair,
+    Verification,
+    Learning,
 }
 
-pub struct PlannerAgent;
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentCapability {
+    pub can_modify_files: bool,
+    pub can_execute_commands: bool,
+    pub can_verify: bool,
+    pub can_access_memory: bool,
+}
 
-#[async_trait]
-impl Agent for PlannerAgent {
-    fn name(&self) -> &str { "PlannerAgent" }
-    
-    #[instrument(skip(self, fabric))]
-    async fn execute(&self, fabric: SharedEventFabric, project_id: String, _payload: serde_json::Value) -> Result<()> {
-        info!(agent = self.name(), project_id = %project_id, "Agent beginning execution");
-        // Emit event: Task Started
-        fabric.publish(SystemEvent {
-            event_type: EventType::TaskStarted,
-            project_id: project_id.clone(),
-            payload: json!({"agent": self.name(), "action": "planning"}),
-            timestamp: 0, // Should use real timestamp
-        })?;
+impl AgentCapability {
+    pub fn restricted() -> Self {
+        Self {
+            can_modify_files: false,
+            can_execute_commands: false,
+            can_verify: false,
+            can_access_memory: false,
+        }
+    }
 
-        // Logic for planning goes here
-        
-        // Emit event: Task Completed
-        fabric.publish(SystemEvent {
-            event_type: EventType::TaskCompleted,
-            project_id,
-            payload: json!({"agent": self.name(), "result": "DAG updated"}),
-            timestamp: 0,
-        })?;
-
-        Ok(())
+    pub fn full() -> Self {
+        Self {
+            can_modify_files: true,
+            can_execute_commands: true,
+            can_verify: true,
+            can_access_memory: true,
+        }
     }
 }
-
-pub type SharedAgent = Arc<dyn Agent>;
