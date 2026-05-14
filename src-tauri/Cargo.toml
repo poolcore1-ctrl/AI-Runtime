@@ -26,4 +26,8 @@ futures = "0.3"
 dashmap = "5"
 uuid = { version = "1", features = ["v4", "serde"] }
 async-trait = "0.1"
-
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tree-sitter = "0.22"
+tree-sitter-rust = "0.21"
+tree-sitter-typescript = "0.21"

@@ -4,6 +4,7 @@ use uuid::Uuid;
 use dashmap::DashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tracing::{info, debug, instrument};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TaskStatus {
@@ -39,7 +40,9 @@ pub struct CognitiveCell {
 }
 
 impl CognitiveCell {
+    #[instrument]
     pub fn new(id: String, project_path: String) -> Self {
+        debug!("Initializing Cognitive Cell");
         Self {
             id,
             project_path,
@@ -51,12 +54,16 @@ impl CognitiveCell {
         }
     }
 
+    #[instrument(skip(self))]
     pub async fn add_task(&self, task: Task) {
+        debug!(task_id = %task.id, "Adding task to ThoughtDAG");
         let mut dag = self.dag.lock().await;
         dag.tasks.insert(task.id.clone(), task);
     }
 
+    #[instrument(skip(self))]
     pub async fn update_task_status(&self, task_id: &str, status: TaskStatus) {
+        info!(task_id = %task_id, ?status, "Updating task status");
         let mut dag = self.dag.lock().await;
         if let Some(task) = dag.tasks.get_mut(task_id) {
             task.status = status;
@@ -75,7 +82,9 @@ impl Engine {
         }
     }
 
+    #[instrument(skip(self))]
     pub fn create_cell(&self, project_path: String) -> String {
+        info!(project_path = %project_path, "Creating new Cognitive Cell");
         let id = Uuid::new_v4().to_string();
         let cell = Arc::new(CognitiveCell::new(id.clone(), project_path));
         self.cells.insert(id.clone(), cell);

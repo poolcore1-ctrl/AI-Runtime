@@ -2,6 +2,7 @@ pub mod events;
 pub mod engine;
 pub mod storage;
 pub mod agents;
+pub mod intelligence;
 
 use std::sync::Arc;
 use tauri::{Manager, Emitter};

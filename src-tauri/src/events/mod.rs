@@ -1,6 +1,7 @@
 use serde::{Serialize, Deserialize};
 use tokio::sync::broadcast;
 use std::sync::Arc;
+use tracing::{debug, instrument};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum EventType {
@@ -39,7 +40,9 @@ impl EventFabric {
         Self { sender }
     }
 
+    #[instrument(skip(self))]
     pub fn publish(&self, event: SystemEvent) -> Result<usize, broadcast::error::SendError<SystemEvent>> {
+        debug!(event_type = ?event.event_type, project_id = %event.project_id, "Publishing system event");
         self.sender.send(event)
     }
 
