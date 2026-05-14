@@ -2,6 +2,7 @@ use tree_sitter::{Parser, Language, Tree};
 use anyhow::{Result, anyhow};
 
 /// Supported parsing languages
+#[derive(Debug)]
 pub enum SupportedLanguage {
     Rust,
     TypeScript,
