@@ -2,12 +2,22 @@ use serde::{Serialize, Deserialize};
 use crate::runtime::errors::FailureFingerprint;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CoordinationMetrics {
+    pub conflicting_edits: usize,
+    pub duplicate_reasoning: usize,
+    pub orchestration_latency: u64,
+    pub repair_cascades: usize,
+    pub strategy_reuse_rate: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RepairTraceReport {
     pub session_id: String,
     pub initial_failure: FailureFingerprint,
     pub attempts: Vec<RepairAttempt>,
     pub final_outcome: RepairOutcome,
     pub total_duration_ms: u64,
+    pub coordination_metrics: Option<CoordinationMetrics>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

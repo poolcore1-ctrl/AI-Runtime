@@ -45,6 +45,7 @@ impl RepairEngine {
             attempts: Vec::new(),
             final_outcome: RepairOutcome::MaxAttemptsExceeded,
             total_duration_ms: 0, // TODO: track time
+            coordination_metrics: None,
         };
 
         let mut attempts = 0;

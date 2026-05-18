@@ -20,6 +20,23 @@ impl SnapshotManager {
     pub async fn create_snapshot(&self, cwd: &str, label: &str) -> Result<String> {
         info!(cwd = %cwd, label = %label, "Creating workspace snapshot");
         
+        // 0. Check if workspace is dirty
+        let status_output = match std::process::Command::new("git")
+            .args(&["status", "--porcelain", "."])
+            .current_dir(cwd)
+            .output() {
+                Ok(o) => o,
+                Err(e) => {
+                    warn!("git command failed or not found: {}. Defaulting to CLEAN_WORKSPACE.", e);
+                    return Ok("CLEAN_WORKSPACE".to_string());
+                }
+            };
+        
+        if status_output.stdout.is_empty() {
+            info!("Workspace clean, using CLEAN_WORKSPACE token");
+            return Ok("CLEAN_WORKSPACE".to_string());
+        }
+
         let (tx, mut rx) = mpsc::channel(1024);
         tokio::spawn(async move { while let Some(_) = rx.recv().await {} });
 
@@ -53,7 +70,11 @@ impl SnapshotManager {
         let (tx, mut rx) = mpsc::channel(1024);
         tokio::spawn(async move { while let Some(_) = rx.recv().await {} });
 
-        let exit_code = self.executor.execute("git", &["reset", "--hard", snapshot_hash], cwd, tx).await?;
+        let exit_code = if snapshot_hash == "CLEAN_WORKSPACE" {
+            self.executor.execute("git", &["reset", "--hard", "HEAD"], cwd, tx).await?
+        } else {
+            self.executor.execute("git", &["reset", "--hard", snapshot_hash], cwd, tx).await?
+        };
         
         if exit_code != 0 {
             return Err(anyhow!("Failed to rollback to snapshot {}", snapshot_hash));

@@ -2,6 +2,7 @@ pub mod types;
 pub mod planning;
 pub mod critique;
 pub mod executor;
+pub mod test_harness;
 
 use serde::{Serialize, Deserialize};
 
