@@ -29,8 +29,20 @@ impl Storage {
                 category TEXT NOT NULL,
                 strategy TEXT NOT NULL,
                 context TEXT,
-                success_rate REAL,
-                learned_at INTEGER NOT NULL
+                success_rate REAL NOT NULL DEFAULT 1.0,
+                stability_score REAL NOT NULL DEFAULT 1.0,
+                verification_reliability REAL NOT NULL DEFAULT 1.0,
+                application_count INTEGER NOT NULL DEFAULT 1,
+                consecutive_failures INTEGER NOT NULL DEFAULT 0,
+                last_decay_timestamp INTEGER NOT NULL DEFAULT 0,
+                parent_strategy_id TEXT,
+                derived_from_session TEXT,
+                verification_history TEXT NOT NULL DEFAULT '[]',
+                quarantine_history TEXT NOT NULL DEFAULT '[]',
+                strategy_state TEXT NOT NULL DEFAULT 'Experimental',
+                verification_surface_coverage TEXT NOT NULL DEFAULT 'BuildOnly',
+                learned_at INTEGER NOT NULL,
+                last_used_at INTEGER NOT NULL
             )",
             [],
         )?;

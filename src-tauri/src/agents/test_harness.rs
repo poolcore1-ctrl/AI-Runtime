@@ -81,7 +81,7 @@ impl MultiAgentTestHarness {
         info!("Step 4: Abstracting learned strategy and saving in Strategy Store");
         if mock_report.final_outcome == RepairOutcome::Success {
             let strategy = self.learning.abstraction.abstract_trace(&mock_report)?;
-            self.learning.store.save(strategy);
+            let _ = self.learning.store.save(&strategy);
             info!("Successfully stored newly abstracted strategy!");
         }
 
@@ -97,7 +97,8 @@ mod tests {
     #[tokio::test]
     async fn test_multi_agent_flow() {
         let intelligence = Arc::new(IntelligenceEngine::new().unwrap());
-        let learning = Arc::new(LearningEngine::new());
+        let storage = Arc::new(crate::storage::Storage::new(":memory:").unwrap());
+        let learning = Arc::new(LearningEngine::new(storage));
         let harness = MultiAgentTestHarness::new(intelligence, learning.clone());
 
         let cwd = "c:/Drive_D/Runtime/test_project";
@@ -116,7 +117,9 @@ mod tests {
         assert_eq!(metrics.strategy_reuse_rate, 1.0);
 
         let best_strategy = learning.store.get_best_strategy("typescript_structural_extension");
-        assert!(best_strategy.is_some());
-        assert_eq!(best_strategy.unwrap().pattern_name, "typescript_structural_extension");
+        assert!(best_strategy.is_ok());
+        let strategy_opt = best_strategy.unwrap();
+        assert!(strategy_opt.is_some());
+        assert_eq!(strategy_opt.unwrap().pattern_name, "typescript_structural_extension");
     }
 }

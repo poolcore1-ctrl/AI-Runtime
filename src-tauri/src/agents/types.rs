@@ -28,7 +28,7 @@ impl ArchitectAgent {
         info!("ArchitectAgent designing implementation path");
         // Look up relevant symbols/patterns
         let relevant_symbols = intelligence.retrieval.find_relevant_symbols(prompt);
-        let best_strategy = learning.store.get_best_strategy("typescript_structural_extension");
+        let best_strategy = learning.store.get_best_strategy("typescript_structural_extension").unwrap_or(None);
         
         let design = format!(
             "Design for prompt: '{}'. Found {} relevant symbols. Reusing best strategy: {:?}",
