@@ -200,8 +200,8 @@ mod tests {
 
     #[test]
     fn test_graph_compilation() {
-        use crate::learning::ir::{StrategyIR, StrategyMetadata, StrategyConstraint, NormalizedStep, ActionType, ConstraintType, ConstraintSeverity, DeterminismLevel};
-        use crate::cognition::graph::{CognitiveNodeType, ExecutionMode};
+        use crate::learning::ir::{StrategyIR, StrategyMetadata, DeterminismLevel};
+        use crate::cognition::graph::ExecutionMode;
         use crate::cognition::compiler::CognitiveGraphCompiler;
         use crate::stress_testing::types::EntropyClass;
 
@@ -280,8 +280,8 @@ mod tests {
 
     #[test]
     fn test_entropy_topology_mutation() {
-        use crate::learning::ir::{StrategyIR, StrategyMetadata, StrategyConstraint, NormalizedStep, ActionType, ConstraintType, ConstraintSeverity, DeterminismLevel};
-        use crate::cognition::graph::{CognitiveNodeType, ExecutionMode};
+        use crate::learning::ir::{StrategyIR, StrategyMetadata, DeterminismLevel};
+        use crate::cognition::graph::ExecutionMode;
         use crate::cognition::compiler::CognitiveGraphCompiler;
         use crate::stress_testing::types::EntropyClass;
 
@@ -428,7 +428,7 @@ mod tests {
 
     #[test]
     fn test_graph_cost_governor_enforcement() {
-        use crate::cognition::optimization::{CostGovernorConfig, NodeExecutionMetric};
+        use crate::cognition::optimization::CostGovernorConfig;
         
         let config = CostGovernorConfig {
             max_speculative_branches: 3,
@@ -447,7 +447,7 @@ mod tests {
     #[test]
     fn test_graph_pruning_low_roi_verifiers() {
         use crate::cognition::optimization::{GraphPruner, NodeExecutionMetric};
-        use crate::cognition::graph::{CognitiveExecutionGraph, CognitiveNode, CognitiveNodeType, CognitiveEdge, EdgeCondition, ExecutionMode};
+        use crate::cognition::graph::{CognitiveExecutionGraph, CognitiveNode, CognitiveNodeType, ExecutionMode};
         use crate::stress_testing::types::EntropyClass;
         use std::collections::HashMap;
 
@@ -565,7 +565,7 @@ mod tests {
     #[test]
     fn test_adaptive_traversal_weighting() {
         use crate::cognition::optimization::{GraphPruner, EdgeExecutionProfile};
-        use crate::cognition::graph::{CognitiveExecutionGraph, CognitiveNode, CognitiveNodeType, CognitiveEdge, EdgeCondition, ExecutionMode};
+        use crate::cognition::graph::{CognitiveExecutionGraph, CognitiveEdge, EdgeCondition, ExecutionMode};
         use crate::stress_testing::types::EntropyClass;
         use std::collections::HashMap;
 
