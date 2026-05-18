@@ -6,6 +6,7 @@ use tokio::sync::mpsc;
 use tracing::{info, instrument};
 use anyhow::Result;
 
+#[derive(Clone, Copy)]
 pub struct TaskExecutor;
 
 impl TaskExecutor {

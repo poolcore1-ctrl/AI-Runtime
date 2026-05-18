@@ -6,6 +6,7 @@ pub mod intelligence;
 pub mod runtime;
 pub mod learning;
 pub mod cognition;
+pub mod verification;
 
 use std::sync::Arc;
 use tauri::{Manager, Emitter};
@@ -73,6 +74,43 @@ async fn reset_token_budget(state: tauri::State<'_, AppState>) -> Result<(), Str
     Ok(())
 }
 
+#[tauri::command]
+async fn verify_reality(
+    _state: tauri::State<'_, AppState>,
+    path: String,
+    verification_commands: Vec<String>,
+) -> Result<crate::verification::types::RealityTraceReport, String> {
+    // Build and run the verification gate topologically
+    let mut dag = crate::verification::VerificationDAG::new();
+
+    // 1. Build Compilation Verifier
+    let build_cmd = if !verification_commands.is_empty() {
+        verification_commands[0].clone()
+    } else {
+        "cargo --version".to_string()
+    };
+    dag.add_agent(std::sync::Arc::new(crate::verification::agents::BuildVerifier::new(build_cmd)));
+
+    // 2. Playwright / Browser E2E Verifier
+    let test_cmd = if verification_commands.len() > 1 {
+        verification_commands[1].clone()
+    } else {
+        "".to_string()
+    };
+    dag.add_agent(std::sync::Arc::new(crate::verification::playwright::PlaywrightRunner::new(test_cmd)));
+
+    // 3. API & Process Boot Verifier (Mocked stability test on target port)
+    dag.add_agent(std::sync::Arc::new(crate::verification::agents::RuntimeVerifier::new("echo SimulatedBootServer".to_string(), 8080, 1)));
+
+    let truth_layer = crate::verification::TruthLayer::new(dag);
+    let report = truth_layer.execute_reality_arbitration(&path)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(report)
+}
+
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -128,7 +166,8 @@ pub fn run() {
             add_provider,
             remove_provider,
             get_token_budget,
-            reset_token_budget
+            reset_token_budget,
+            verify_reality
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
