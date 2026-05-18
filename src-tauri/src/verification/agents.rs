@@ -356,7 +356,6 @@ impl VerificationAgent for WorkflowVerifier {
         let duration = start.elapsed();
         budget.consume_resource(duration, 0)?;
 
-        let log_text = logs.join("\n");
         let fingerprint = if passed {
             VerificationFingerprint::Unknown
         } else if error_msg.as_ref().map(|s| s.contains("Invariant")).unwrap_or(false) {
@@ -453,7 +452,6 @@ impl VerificationAgent for StateTransitionVerifier {
         let duration = start.elapsed();
         budget.consume_resource(duration, 0)?;
 
-        let log_text = logs.join("\n");
         let fingerprint = if passed {
             VerificationFingerprint::Unknown
         } else {
@@ -527,7 +525,7 @@ impl VerificationAgent for PersistenceVerifier {
 
                 if write_res.is_ok() {
                     logs.push("Executing CRUD Read operation".to_string());
-                    let mut stmt = conn.prepare("SELECT value FROM test_crud WHERE id = ?1");
+                    let stmt = conn.prepare("SELECT value FROM test_crud WHERE id = ?1");
                     if let Ok(mut prepared) = stmt {
                         let query_res = prepared.query_row(["row1"], |row| {
                             let value: String = row.get(0)?;
@@ -573,7 +571,6 @@ impl VerificationAgent for PersistenceVerifier {
         let duration = start.elapsed();
         budget.consume_resource(duration, 0)?;
 
-        let log_text = logs.join("\n");
         let fingerprint = if passed {
             VerificationFingerprint::Unknown
         } else {
