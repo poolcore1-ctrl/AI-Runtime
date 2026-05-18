@@ -59,6 +59,11 @@ async fn add_provider(state: tauri::State<'_, AppState>, provider: crate::cognit
 }
 
 #[tauri::command]
+async fn get_provider_health(state: tauri::State<'_, AppState>, id: String) -> Result<Option<crate::cognition::provider::ProviderHealthMetrics>, String> {
+    state.cognition.registry.get_health_metrics(&id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn remove_provider(state: tauri::State<'_, AppState>, id: String) -> Result<(), String> {
     state.cognition.registry.remove_provider(&id).map_err(|e| e.to_string())
 }
@@ -164,6 +169,7 @@ pub fn run() {
             import_knowledge,
             get_providers,
             add_provider,
+            get_provider_health,
             remove_provider,
             get_token_budget,
             reset_token_budget,

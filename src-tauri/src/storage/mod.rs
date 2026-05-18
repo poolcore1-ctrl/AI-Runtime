@@ -44,7 +44,57 @@ impl Storage {
                 is_enabled INTEGER NOT NULL DEFAULT 1,
                 capabilities TEXT NOT NULL,
                 routing_priority INTEGER NOT NULL DEFAULT 0,
-                model_name TEXT NOT NULL DEFAULT ''
+                model_name TEXT NOT NULL DEFAULT '',
+                provider_family TEXT NOT NULL DEFAULT 'openai',
+                price_input_million REAL NOT NULL DEFAULT 0.0,
+                price_output_million REAL NOT NULL DEFAULT 0.0,
+                timeout_secs INTEGER NOT NULL DEFAULT 30,
+                payload_template TEXT,
+                headers_template TEXT
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS provider_health (
+                provider_id TEXT PRIMARY KEY,
+                success_count INTEGER NOT NULL DEFAULT 0,
+                failure_count INTEGER NOT NULL DEFAULT 0,
+                consecutive_failures INTEGER NOT NULL DEFAULT 0,
+                average_latency_ms INTEGER NOT NULL DEFAULT 0,
+                health_score REAL NOT NULL DEFAULT 1.0,
+                quality_score REAL NOT NULL DEFAULT 1.0,
+                last_error_type TEXT
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cognitive_sessions (
+                session_id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                active_capability TEXT NOT NULL,
+                active_provider_id TEXT,
+                provider_chain TEXT NOT NULL,
+                strategy_fingerprint TEXT,
+                current_dag_node TEXT,
+                token_budget_state TEXT NOT NULL,
+                repair_attempt_count INTEGER NOT NULL DEFAULT 0,
+                timestamp INTEGER NOT NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cognitive_checkpoints (
+                checkpoint_id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                active_task_id TEXT NOT NULL,
+                step_index INTEGER NOT NULL,
+                plan_dag TEXT NOT NULL,
+                partial_patch TEXT,
+                reasoning_history TEXT NOT NULL,
+                timestamp INTEGER NOT NULL
             )",
             [],
         )?;
