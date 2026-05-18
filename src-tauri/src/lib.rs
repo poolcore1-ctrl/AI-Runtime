@@ -5,17 +5,20 @@ pub mod agents;
 pub mod intelligence;
 pub mod runtime;
 pub mod learning;
+pub mod cognition;
 
 use std::sync::Arc;
 use tauri::{Manager, Emitter};
 use crate::events::EventFabric;
 use crate::engine::Engine;
 use crate::storage::Storage;
+use crate::cognition::CognitionEngine;
 
 pub struct AppState {
     pub events: Arc<EventFabric>,
     pub engine: Arc<Engine>,
     pub storage: Arc<Storage>,
+    pub cognition: Arc<CognitionEngine>,
 }
 
 #[tauri::command]
@@ -44,6 +47,32 @@ async fn import_knowledge(state: tauri::State<'_, AppState>, input_path: String)
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+async fn get_providers(state: tauri::State<'_, AppState>) -> Result<Vec<crate::cognition::provider::RegisteredProvider>, String> {
+    state.cognition.registry.get_providers().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn add_provider(state: tauri::State<'_, AppState>, provider: crate::cognition::provider::RegisteredProvider) -> Result<(), String> {
+    state.cognition.registry.add_provider(provider).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn remove_provider(state: tauri::State<'_, AppState>, id: String) -> Result<(), String> {
+    state.cognition.registry.remove_provider(&id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_token_budget(state: tauri::State<'_, AppState>) -> Result<crate::cognition::budget::TokenBudgetState, String> {
+    Ok(state.cognition.budget.get_state())
+}
+
+#[tauri::command]
+async fn reset_token_budget(state: tauri::State<'_, AppState>) -> Result<(), String> {
+    state.cognition.budget.reset();
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -68,6 +97,7 @@ pub fn run() {
                 }
 
                 let storage = Arc::new(Storage::new(&db_path_str).expect("Failed to init storage"));
+                let cognition = Arc::new(CognitionEngine::new(storage.clone()));
                 
                 // Spawn event listener to stream to UI
                 let events_for_streaming = events.clone();
@@ -83,12 +113,23 @@ pub fn run() {
                     events,
                     engine,
                     storage,
+                    cognition,
                 });
             });
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_projects, create_project, export_knowledge, import_knowledge])
+        .invoke_handler(tauri::generate_handler![
+            get_projects, 
+            create_project, 
+            export_knowledge, 
+            import_knowledge,
+            get_providers,
+            add_provider,
+            remove_provider,
+            get_token_budget,
+            reset_token_budget
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

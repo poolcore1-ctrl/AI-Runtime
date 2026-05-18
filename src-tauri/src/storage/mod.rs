@@ -35,6 +35,20 @@ impl Storage {
             [],
         )?;
 
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS provider_configs (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                api_url TEXT NOT NULL,
+                api_key TEXT,
+                is_enabled INTEGER NOT NULL DEFAULT 1,
+                capabilities TEXT NOT NULL,
+                routing_priority INTEGER NOT NULL DEFAULT 0,
+                model_name TEXT NOT NULL DEFAULT ''
+            )",
+            [],
+        )?;
+
         Ok(Self { conn: Mutex::new(conn) })
     }
 }
