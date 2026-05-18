@@ -361,7 +361,169 @@ impl Storage {
             [],
         )?;
 
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cognitive_identity_epochs (
+                epoch_id TEXT PRIMARY KEY,
+                traits_json TEXT NOT NULL,
+                constitutional_hash TEXT NOT NULL,
+                timestamp INTEGER NOT NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS introspection_causal_chains (
+                chain_id TEXT PRIMARY KEY,
+                triggering_event TEXT NOT NULL,
+                rules_json TEXT NOT NULL,
+                final_decision TEXT NOT NULL,
+                timestamp INTEGER NOT NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cognitive_reality_anchors (
+                anchor_id TEXT PRIMARY KEY,
+                source_node TEXT NOT NULL,
+                grounding_vector_json TEXT NOT NULL,
+                integrity_seal TEXT NOT NULL,
+                timestamp INTEGER NOT NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS telemetry_profiles (
+                profile_id TEXT PRIMARY KEY,
+                source_node TEXT NOT NULL,
+                context_envelope_json TEXT NOT NULL,
+                duration_ms REAL NOT NULL,
+                timestamp INTEGER NOT NULL
+            )",
+            [],
+        )?;
+
         Ok(Self { conn: Mutex::new(conn) })
+    }
+
+    pub fn save_physiology_snapshot(
+        &self,
+        snapshot_id: &str,
+        entropy_pressure: f64,
+        contradiction_density: f64,
+        memory_saturation: f64,
+        timestamp: i64,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO cognitive_physiology (
+                snapshot_id, entropy_pressure, contradiction_density, memory_saturation, timestamp
+             ) VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(snapshot_id) DO UPDATE SET
+                entropy_pressure = excluded.entropy_pressure,
+                contradiction_density = excluded.contradiction_density,
+                memory_saturation = excluded.memory_saturation,
+                timestamp = excluded.timestamp",
+            (
+                snapshot_id,
+                entropy_pressure,
+                contradiction_density,
+                memory_saturation,
+                timestamp,
+            ),
+        )?;
+        Ok(())
+    }
+
+    pub fn save_identity_epoch(
+        &self,
+        epoch_id: &str,
+        traits_json: &str,
+        constitutional_hash: &str,
+        timestamp: i64,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO cognitive_identity_epochs (
+                epoch_id, traits_json, constitutional_hash, timestamp
+             ) VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(epoch_id) DO UPDATE SET
+                traits_json = excluded.traits_json,
+                constitutional_hash = excluded.constitutional_hash,
+                timestamp = excluded.timestamp",
+            (epoch_id, traits_json, constitutional_hash, timestamp),
+        )?;
+        Ok(())
+    }
+
+    pub fn save_causal_chain(
+        &self,
+        chain_id: &str,
+        triggering_event: &str,
+        rules_json: &str,
+        final_decision: &str,
+        timestamp: i64,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO introspection_causal_chains (
+                chain_id, triggering_event, rules_json, final_decision, timestamp
+             ) VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(chain_id) DO UPDATE SET
+                triggering_event = excluded.triggering_event,
+                rules_json = excluded.rules_json,
+                final_decision = excluded.final_decision,
+                timestamp = excluded.timestamp",
+            (chain_id, triggering_event, rules_json, final_decision, timestamp),
+        )?;
+        Ok(())
+    }
+
+    pub fn save_reality_anchor(
+        &self,
+        anchor_id: &str,
+        source_node: &str,
+        grounding_vector_json: &str,
+        integrity_seal: &str,
+        timestamp: i64,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO cognitive_reality_anchors (
+                anchor_id, source_node, grounding_vector_json, integrity_seal, timestamp
+             ) VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(anchor_id) DO UPDATE SET
+                source_node = excluded.source_node,
+                grounding_vector_json = excluded.grounding_vector_json,
+                integrity_seal = excluded.integrity_seal,
+                timestamp = excluded.timestamp",
+            (anchor_id, source_node, grounding_vector_json, integrity_seal, timestamp),
+        )?;
+        Ok(())
+    }
+
+    pub fn save_telemetry_profile(
+        &self,
+        profile_id: &str,
+        source_node: &str,
+        context_envelope_json: &str,
+        duration_ms: f64,
+        timestamp: i64,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO telemetry_profiles (
+                profile_id, source_node, context_envelope_json, duration_ms, timestamp
+             ) VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(profile_id) DO UPDATE SET
+                source_node = excluded.source_node,
+                context_envelope_json = excluded.context_envelope_json,
+                duration_ms = excluded.duration_ms,
+                timestamp = excluded.timestamp",
+            (profile_id, source_node, context_envelope_json, duration_ms, timestamp),
+        )?;
+        Ok(())
     }
 }
 

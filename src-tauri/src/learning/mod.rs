@@ -262,7 +262,7 @@ Index: src/main.rs
 
     #[test]
     fn test_prompt_translation_compilation() {
-        use crate::learning::ir::{StrategyIR, ActionType, NormalizedStep, StrategyConstraint, ConstraintType, ConstraintSeverity, StrategyMetadata, DeterminismLevel};
+        use crate::learning::ir::{StrategyIR, ActionType, NormalizedStep, StrategyMetadata, DeterminismLevel};
         use crate::learning::translation::{PromptCompiler, ClaudeCompiler, GeminiCompiler, DeepSeekCompiler, LocalCompiler, CompressionLevel};
 
         let metadata = StrategyMetadata {
@@ -315,7 +315,7 @@ Index: src/main.rs
 
         // 5. Local Compiler - Aggressive Compression
         let local_aggressive = LocalCompiler { compression: CompressionLevel::Aggressive }.compile(&ir);
-        assert!(!local_moderate.contains("Brief Steps: Edit on src/config.rs"));
+        assert!(!local_aggressive.contains("Brief Steps: Edit on src/config.rs")); // Aggressive omits the verbose format
         assert!(local_aggressive.contains("Repair targets: ServerConfig"));
     }
 
@@ -385,7 +385,7 @@ Index: src/main.rs
 
     #[test]
     fn test_cross_model_drift_prediction() {
-        use crate::learning::ir::{StrategyIR, ActionType, NormalizedStep, StrategyConstraint, ConstraintType, ConstraintSeverity, StrategyMetadata, DeterminismLevel};
+        use crate::learning::ir::{StrategyIR, ActionType, NormalizedStep, StrategyMetadata, DeterminismLevel};
         use crate::learning::drift_predictor::{CrossModelDriftPredictor, DriftRisk};
 
         let metadata = StrategyMetadata {

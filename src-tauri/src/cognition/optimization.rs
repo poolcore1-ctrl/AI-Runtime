@@ -180,8 +180,17 @@ impl GraphCompressionEngine {
             }
         }
 
-        // Retain only valid non-self edges
-        graph.edges.retain(|e| e.from != e.to);
+        // Drop internal edges referencing either compressed node (now gone from the graph),
+        // then drop any self-loops that may have been created by the rewiring pass.
+        let target_set: std::collections::HashSet<String> = target_nodes.iter().cloned().collect();
+        graph.edges.retain(|e| {
+            // Remove if either endpoint still references a removed node (internal edge)
+            if target_set.contains(&e.from) || target_set.contains(&e.to) {
+                return false;
+            }
+            // Remove self-loops created during rewiring
+            e.from != e.to
+        });
 
         true
     }

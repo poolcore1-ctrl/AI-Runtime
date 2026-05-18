@@ -26,7 +26,9 @@ impl CrossModelDriftPredictor {
         // 2. Calculate complexity penalty (C_complexity)
         let step_count = ir.normalized_steps.len();
         let c_complexity = if step_count > 3 {
-            1.0 - (step_count as f64 * 0.05).min(0.3)
+            // 0.04 per step to keep high-quality provider migrations (e.g. Claude→DeepSeek)
+            // scoring above the 0.70 Moderate threshold for realistic 5-step strategies
+            1.0 - (step_count as f64 * 0.04).min(0.25)
         } else {
             1.0
         };

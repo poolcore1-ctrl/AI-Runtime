@@ -27,6 +27,25 @@ pub mod regulator;
 pub mod metabolism;
 pub mod consolidation;
 pub mod diversity;
+pub mod physiology;
+pub mod pathology;
+pub mod energy;
+pub mod fatigue;
+pub mod recovery;
+pub mod identity_anchor;
+pub mod self_model;
+pub mod coherence;
+pub mod introspection;
+pub mod lineage;
+pub mod fracture;
+pub mod grounding;
+pub mod compiler_driver;
+pub mod sandbox_driver;
+pub mod telemetry;
+pub mod human_gate;
+
+
+
 
 use crate::storage::SharedStorage;
 use crate::cognition::provider::ProviderRegistry;
@@ -939,4 +958,479 @@ mod tests {
         assert!(audit.is_some());
         assert!(!audit.unwrap().violated_laws.is_empty());
     }
+
+    #[test]
+    fn test_hysteresis_oscillation_protection() {
+        use crate::cognition::physiology::{CognitivePhysiologyEngine, CognitiveStabilityState, CognitiveVitals, CognitiveEnvironment};
+
+        let engine = CognitivePhysiologyEngine::new();
+        let vitals = CognitiveVitals {
+            entropy_pressure: 0.1,
+            contradiction_density: 0.0,
+            replay_instability: 0.0,
+            provider_fatigue: 0.0,
+            verifier_saturation: 0.0,
+            graph_complexity_load: 0.0,
+            memory_fragmentation: 0.0,
+        };
+        let env = CognitiveEnvironment {
+            global_entropy: 0.0,
+            provider_market_instability: 0.0,
+            memory_reliability: 1.0,
+            replay_confidence: 1.0,
+        };
+
+        // 1. Pristine state -> Stable
+        let stability = engine.calculate_stability(&vitals, &env, 0);
+        let state = engine.transition_state(CognitiveStabilityState::Stable, stability, 0);
+        assert_eq!(state, CognitiveStabilityState::Stable);
+
+        // 2. Drop stability below escalation threshold (e.g. stability = 0.55 < 0.60)
+        let state = engine.transition_state(CognitiveStabilityState::Stable, 0.55, 0);
+        assert_eq!(state, CognitiveStabilityState::ElevatedStress);
+
+        // 3. Minor recovery but remains below recovery threshold (stability = 0.72 < 0.75)
+        // With Hysteresis: Should stay in ElevatedStress to prevent constant state flipping
+        let state_still_stressed = engine.transition_state(CognitiveStabilityState::ElevatedStress, 0.72, 0);
+        assert_eq!(state_still_stressed, CognitiveStabilityState::ElevatedStress);
+
+        // 4. Full recovery above recovery threshold (stability = 0.78 >= 0.75)
+        let state_recovered = engine.transition_state(CognitiveStabilityState::ElevatedStress, 0.78, 0);
+        assert_eq!(state_recovered, CognitiveStabilityState::Stable);
+    }
+
+    #[test]
+    fn test_provider_fatigue_accel() {
+        use crate::cognition::fatigue::{ProviderFatigueModel};
+
+        let mut model = ProviderFatigueModel::new();
+
+        // 1. Initial pristine state
+        assert_eq!(model.get_fatigue_score("claude"), 0.0);
+        assert_eq!(model.get_hallucination_multiplier("claude"), 1.0);
+
+        // 2. Record standard usage (within limit)
+        model.record_usage("claude", 4, 0.5);
+        let fatigue_1 = model.get_fatigue_score("claude");
+        assert!(fatigue_1 > 0.0);
+
+        // 3. Record heavy usage exceeding sustained reasoning limit (limit = 8)
+        // Triggers accelerated fatigue buildup and behavioral degradation
+        model.record_usage("claude", 12, 0.9);
+        let fatigue_2 = model.get_fatigue_score("claude");
+        assert!(fatigue_2 > fatigue_1);
+
+        // Multiplier spikes exponentially when fatigue is high
+        let multiplier = model.get_hallucination_multiplier("claude");
+        assert!(multiplier > 1.2);
+
+        // 4. Cooldown cycles decay fatigue
+        model.cool_down(5.0);
+        let fatigue_cooled = model.get_fatigue_score("claude");
+        assert!(fatigue_cooled < fatigue_2);
+    }
+
+    #[test]
+    fn test_energy_prioritization() {
+        use crate::cognition::energy::{CognitiveEnergyAllocator, TaskCriticality};
+        use crate::cognition::physiology::CognitiveStabilityState;
+
+        let allocator = CognitiveEnergyAllocator::new();
+
+        // 1. Critical security repair under Stable state -> Maximum speculation/verifiers permitted
+        let security_budget = allocator.allocate_budget(TaskCriticality::CriticalSecurity, CognitiveStabilityState::Stable);
+        assert_eq!(security_budget.max_speculative_branches, 5);
+        assert_eq!(security_budget.sandbox_isolation_level, 3);
+
+        // 2. Aesthetic UI tweak under Degraded state -> Suspended/0 budget to protect stable physiology
+        let aesthetic_budget = allocator.allocate_budget(TaskCriticality::AestheticTweak, CognitiveStabilityState::Degraded);
+        assert_eq!(aesthetic_budget.max_speculative_branches, 0);
+        assert_eq!(aesthetic_budget.token_ceiling, 0);
+
+        // 3. Critical security repair under Critical state -> Clamp spec down but keep isolated security loop active
+        let critical_security_budget = allocator.allocate_budget(TaskCriticality::CriticalSecurity, CognitiveStabilityState::Critical);
+        assert_eq!(critical_security_budget.max_speculative_branches, 1);
+        assert_eq!(critical_security_budget.sandbox_isolation_level, 3);
+    }
+
+    #[test]
+    fn test_pathology_loop_quarantine() {
+        use crate::cognition::pathology::{PathologyDetector, CognitivePathology};
+        use crate::cognition::physiology::{CognitiveVitals, PhysiologySnapshot, CognitiveStabilityState};
+
+        let detector = PathologyDetector::new();
+        let vitals = CognitiveVitals {
+            entropy_pressure: 0.1,
+            contradiction_density: 0.1,
+            replay_instability: 0.85,
+            provider_fatigue: 0.1,
+            verifier_saturation: 0.1,
+            graph_complexity_load: 0.1,
+            memory_fragmentation: 0.1,
+        };
+
+        // Construct history showing rising replay instability (Replay Fixation)
+        let history = vec![
+            PhysiologySnapshot {
+                snapshot_id: "s1".to_string(),
+                vitals: CognitiveVitals { replay_instability: 0.45, ..vitals.clone() },
+                active_pathologies: vec![],
+                stability_state: CognitiveStabilityState::ElevatedStress,
+                timestamp: 1,
+            },
+            PhysiologySnapshot {
+                snapshot_id: "s2".to_string(),
+                vitals: CognitiveVitals { replay_instability: 0.65, ..vitals.clone() },
+                active_pathologies: vec![],
+                stability_state: CognitiveStabilityState::ElevatedStress,
+                timestamp: 2,
+            },
+            PhysiologySnapshot {
+                snapshot_id: "s3".to_string(),
+                vitals: CognitiveVitals { replay_instability: 0.85, ..vitals.clone() },
+                active_pathologies: vec![],
+                stability_state: CognitiveStabilityState::ElevatedStress,
+                timestamp: 3,
+            },
+        ];
+
+        let diagnosed = detector.detect_pathologies(&vitals, &history);
+        assert!(diagnosed.contains(&CognitivePathology::ReplayFixation));
+    }
+
+    #[test]
+    fn test_dream_replay_drift_detection() {
+        use crate::cognition::consolidation::{ConsolidationEngine};
+
+        let engine = ConsolidationEngine::new();
+
+        // Simulate a dream replay with minor drift (15%) -> remains above threshold (dream success = 0.85 * 0.85 = 0.7225)
+        let dream_stable = engine.simulate_dream_replay("g_1", 0.85, 0.15);
+        assert!(!dream_stable.drift_detected);
+        assert_eq!(dream_stable.adjustments_made, 0);
+
+        // Dream replay with severe drift (50%) -> drops below 70% threshold -> requires dynamic realignments
+        let dream_drifted = engine.simulate_dream_replay("g_2", 0.90, 0.50);
+        assert!(dream_drifted.drift_detected);
+        assert_eq!(dream_drifted.adjustments_made, 3);
+    }
+
+    #[test]
+    fn test_self_healing_recovery_trigger() {
+        use crate::cognition::recovery::{CognitiveRecoveryCoordinator};
+        use crate::cognition::physiology::{CognitiveStabilityState, CognitiveVitals};
+        use crate::cognition::belief_graph::CognitiveBelief;
+
+        let coordinator = CognitiveRecoveryCoordinator::new();
+
+        // 1. Purge poisoned/weak beliefs
+        let mut beliefs = vec![
+            CognitiveBelief {
+                belief_id: "b1".to_string(), statement: "A".to_string(), confidence: 0.90,
+                supporting_evidence: vec![], contradictory_evidence: vec![], source_systems: vec![], temporal_stability: 1.0
+            },
+            CognitiveBelief {
+                belief_id: "b2".to_string(), statement: "B".to_string(), confidence: 0.10, // weak/contradicted
+                supporting_evidence: vec![], contradictory_evidence: vec![], source_systems: vec![], temporal_stability: 0.1
+            }
+        ];
+        let purged = coordinator.purge_poisoned_beliefs(&mut beliefs);
+        assert_eq!(purged, 1);
+        assert_eq!(beliefs.len(), 1);
+
+        // 2. Rebuild index layout to clear fragmentation
+        let mut vitals = CognitiveVitals {
+            entropy_pressure: 0.1, contradiction_density: 0.1, replay_instability: 0.1,
+            provider_fatigue: 0.1, verifier_saturation: 0.1, graph_complexity_load: 0.1,
+            memory_fragmentation: 0.90, // severely fragmented
+        };
+        let delta = coordinator.rebuild_memory_index(&mut vitals);
+        assert!(delta > 0.8);
+        assert_eq!(vitals.memory_fragmentation, 0.05);
+
+        // 3. Reset critical/degraded state to Recovery state
+        let mut state = CognitiveStabilityState::Critical;
+        let triggered = coordinator.restore_constitutional_state(&mut state);
+        assert!(triggered);
+        assert_eq!(state, CognitiveStabilityState::Recovery);
+    }
+
+    #[test]
+    fn test_identity_seal_verification() {
+        use crate::cognition::identity_anchor::{IdentityAnchorManager, IdentityAnchor};
+
+        let manager = IdentityAnchorManager::new();
+        let anchors = vec![IdentityAnchor::ConstitutionalSafety, IdentityAnchor::InvariantPreservation];
+
+        // 1. Generate pristine seal
+        let seal = manager.generate_seal("const_v1_hash", &anchors, "epoch_12_hash", 1716000000);
+
+        // 2. Verification passes with expected hashes
+        let verified = manager.verify_seal(&seal, "const_v1_hash", &anchors);
+        assert!(verified);
+
+        // 3. Tampering with constitutional hash fails verification
+        let tampered = manager.verify_seal(&seal, "const_v2_compromised_hash", &anchors);
+        assert!(!tampered);
+    }
+
+    #[test]
+    fn test_drift_velocity_acceleration() {
+        use crate::cognition::self_model::SelfModelGraph;
+
+        let mut graph = SelfModelGraph::new();
+
+        // Propose mutation in Adaptability (delta = 0.2)
+        let res = graph.propose_mutation("Adaptability", 0.2);
+        assert!(res.is_ok());
+
+        // Verify drift velocity and acceleration indicators spiked
+        assert!(graph.drift.short_term_velocity > 0.0);
+        assert!(graph.drift.long_term_velocity > 0.0);
+        assert!(graph.drift.acceleration > 0.0);
+    }
+
+    #[test]
+    fn test_trait_dependency_interaction() {
+        use crate::cognition::self_model::SelfModelGraph;
+
+        let mut graph = SelfModelGraph::new();
+        
+        let initial_adaptability = graph.traits.iter().find(|t| t.trait_name == "Adaptability").unwrap().current_weight;
+
+        // Propose positive mutation to SpeculativeRestraint
+        // Influence edge weight is -0.45. Delta = 0.2. Real delta = 0.2 * (1.0 - 0.8) = 0.04
+        // Expected Adaptability decrease = 0.04 * -0.45 = -0.018
+        let res = graph.propose_mutation("SpeculativeRestraint", 0.2);
+        assert!(res.is_ok());
+
+        let final_adaptability = graph.traits.iter().find(|t| t.trait_name == "Adaptability").unwrap().current_weight;
+        assert!(final_adaptability < initial_adaptability);
+        assert!((final_adaptability - (initial_adaptability - 0.018)).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_context_weighted_replay() {
+        use crate::cognition::coherence::{SelfConsistencyReplayEngine, ReplayContextEnvelope};
+
+        let engine = SelfConsistencyReplayEngine::new();
+
+        // 1. Adaptation under HighChaos: speculative repairs permitted
+        let chaos_envelope = ReplayContextEnvelope {
+            entropy_class: "HighChaos".to_string(),
+            contradiction_density: 0.80,
+            provider_stability: 0.40,
+            physiological_state: "ElevatedStress".to_string(),
+        };
+        let coherent_chaos = engine.verify_self_consistency(&chaos_envelope, false, 0.95);
+        assert!(coherent_chaos);
+
+        // 2. Direct contradiction under LowChaos: speculative actions are inconsistent when SpeculativeRestraint is high
+        let calm_envelope = ReplayContextEnvelope {
+            entropy_class: "LowChaos".to_string(),
+            contradiction_density: 0.10,
+            provider_stability: 0.95,
+            physiological_state: "Stable".to_string(),
+        };
+        let inconsistent_calm = engine.verify_self_consistency(&calm_envelope, false, 0.95);
+        assert!(!inconsistent_calm); // Drift detected!
+    }
+
+    #[test]
+    fn test_identity_recovery_corridor() {
+        use crate::cognition::lineage::{EvolutionaryLineageTracker, IdentityEpoch, IdentityRecoveryCorridor};
+        use crate::cognition::self_model::IdentityTraitVector;
+        use crate::cognition::identity_anchor::{IdentitySeal};
+
+        let tracker = EvolutionaryLineageTracker::new();
+        let corridor = IdentityRecoveryCorridor {
+            authorized_epoch_ids: vec!["epoch_100".to_string(), "epoch_101".to_string()],
+            min_allowed_safety: 0.95,
+            max_allowed_safety: 1.00,
+        };
+
+        // Construct pristine epoch within corridor
+        let safe_epoch = IdentityEpoch {
+            epoch_id: "epoch_100".to_string(),
+            active_traits: vec![IdentityTraitVector {
+                trait_name: "RigorousSafety".to_string(),
+                current_weight: 0.98,
+                minimum_bound: 0.95,
+                maximum_bound: 1.00,
+                mutation_resistance: 0.95,
+                constitutional_priority: 1,
+            }],
+            constitutional_hash: "hash_v1".to_string(),
+            identity_seal: IdentitySeal {
+                constitutional_hash: "hash_v1".to_string(),
+                anchor_hash: "a".to_string(),
+                epoch_hash: "e".to_string(),
+                signed_at: 1,
+            },
+            timestamp: 100,
+        };
+
+        // Construct unsafe/compromised epoch
+        let compromised_epoch = IdentityEpoch {
+            epoch_id: "epoch_999_unauthorized".to_string(),
+            ..safe_epoch.clone()
+        };
+
+        assert!(tracker.is_rollback_authorized(&corridor, &safe_epoch));
+        assert!(!tracker.is_rollback_authorized(&corridor, &compromised_epoch));
+    }
+
+    #[test]
+    fn test_identity_quarantine_escalation() {
+        use crate::cognition::fracture::{IdentityQuarantineCoordinator, FractureSeverity, IdentityQuarantineMode};
+
+        let coordinator = IdentityQuarantineCoordinator::new();
+
+        // 1. Minor Fracture -> ObservationOnly (evolution and live execution active)
+        let mode_minor = coordinator.evaluate_quarantine_mode(FractureSeverity::Minor);
+        assert_eq!(mode_minor, IdentityQuarantineMode::ObservationOnly);
+        assert!(coordinator.is_evolution_permitted(mode_minor));
+        assert!(coordinator.is_live_execution_permitted(mode_minor));
+
+        // 2. Existential Fracture -> FullLockdown (evolution and live execution completely halted)
+        let mode_existential = coordinator.evaluate_quarantine_mode(FractureSeverity::Existential);
+        assert_eq!(mode_existential, IdentityQuarantineMode::FullLockdown);
+        assert!(!coordinator.is_evolution_permitted(mode_existential));
+        assert!(!coordinator.is_live_execution_permitted(mode_existential));
+    }
+
+    #[test]
+    fn test_empirical_compiler_grounding() {
+        use crate::cognition::compiler_driver::{CompilerDriver, CompilerOutcome};
+
+        let driver = CompilerDriver::new();
+        
+        let success = driver.run_compile_check("path", "cargo check");
+        assert_eq!(success, CompilerOutcome::CompilationPassed);
+
+        let fail = driver.run_compile_check("path", "cargo check --syntax_error_trigger");
+        assert!(matches!(fail, CompilerOutcome::SyntaxError(_)));
+    }
+
+    #[test]
+    fn test_flaky_test_probabilistic_weighting() {
+        use crate::cognition::sandbox_driver::{SandboxTestDriver, ReplayStabilityClass};
+
+        let driver = SandboxTestDriver::new();
+
+        let (run, passed, class) = driver.run_test_suite("path", "cargo test --trigger_flaky");
+        assert_eq!(class, ReplayStabilityClass::ProbabilisticFlaky);
+        assert_eq!(run, 10);
+        assert_eq!(passed, 8);
+    }
+
+    #[test]
+    fn test_context_normalized_telemetry() {
+        use crate::cognition::telemetry::{TelemetryProfiler, TelemetryProfile, RuntimeContextEnvelope};
+
+        let profiler = TelemetryProfiler::new();
+
+        let baseline = TelemetryProfile { cpu_usage: 0.20, memory_allocated: 50.0, duration_ms: 100.0 };
+        let baseline_env = RuntimeContextEnvelope {
+            machine_class: "T2".to_string(), cpu_cores: 4, memory_mb: 8192, repository_scale: 1.0, concurrent_load_factor: 1.0
+        };
+
+        // 1. Spiked duration, but concurrent workload factor also tripled: load normalization -> false
+        let high_load_profile = TelemetryProfile { cpu_usage: 0.30, memory_allocated: 60.0, duration_ms: 220.0 };
+        let high_load_env = RuntimeContextEnvelope {
+            machine_class: "T2".to_string(), cpu_cores: 4, memory_mb: 8192, repository_scale: 1.0, concurrent_load_factor: 3.0
+        };
+        let regression_high_load = profiler.detect_performance_regression(&baseline, &baseline_env, &high_load_profile, &high_load_env);
+        assert!(!regression_high_load);
+
+        // 2. Spiked duration with no concurrent load increase: true regression -> true
+        let idle_load_profile = TelemetryProfile { cpu_usage: 0.30, memory_allocated: 60.0, duration_ms: 220.0 };
+        let idle_load_env = RuntimeContextEnvelope {
+            machine_class: "T2".to_string(), cpu_cores: 4, memory_mb: 8192, repository_scale: 1.0, concurrent_load_factor: 1.0
+        };
+        let regression_idle = profiler.detect_performance_regression(&baseline, &baseline_env, &idle_load_profile, &idle_load_env);
+        assert!(regression_idle);
+    }
+
+    #[test]
+    fn test_reality_evidence_integrity_tampering() {
+        use crate::cognition::grounding::RealityEvidenceIntegrity;
+
+        let integrity = RealityEvidenceIntegrity {
+            evidence_signature: "sig_pristine_123".to_string(),
+            sandbox_isolation_hash: "hash_sandbox_456".to_string(),
+            compiler_binary_fingerprint: "fingerprint_bin_789".to_string(),
+        };
+
+        // Complete match -> verification success
+        assert!(integrity.verify_integrity("sig_pristine_123"));
+
+        // Tampered signature -> verification failure
+        assert!(!integrity.verify_integrity("sig_compromised_999"));
+    }
+
+    #[test]
+    fn test_operator_reputation_gate() {
+        use crate::cognition::human_gate::{OperatorGroundingGate, OperatorTrustSignal};
+        use crate::cognition::self_model::SelfModelGraph;
+
+        let gate = OperatorGroundingGate::new();
+
+        // 1. High reputation review with constitutional alignment
+        let safe_review = OperatorTrustSignal {
+            rating: 0.90, reviewer_reputation: 0.95, review_depth: 0.85, constitutional_alignment: 0.90
+        };
+
+        // 2. Malicious/unaligned review -> filtered out completely
+        let dangerous_review = OperatorTrustSignal {
+            rating: 0.10, reviewer_reputation: 0.90, review_depth: 0.90, constitutional_alignment: 0.20
+        };
+
+        let trust = gate.calculate_weighted_trust(&[safe_review, dangerous_review]);
+        assert!(trust > 0.80); // High alignment review dominates
+
+        // 3. Low Operator trust shifts traits Caution constraints
+        let mut self_model = SelfModelGraph::new();
+        gate.balance_identity_traits(&mut self_model.traits, 0.35); // simulated trust below 0.40
+
+        let speculative_restraint = self_model.traits.iter().find(|t| t.trait_name == "SpeculativeRestraint").unwrap().current_weight;
+        let adaptability = self_model.traits.iter().find(|t| t.trait_name == "Adaptability").unwrap().current_weight;
+
+        assert_eq!(speculative_restraint, 0.95); // tightened (+0.10)
+        assert_eq!(adaptability, 0.50); // lowered (-0.15)
+    }
+
+    #[test]
+    fn test_temporal_truth_decay() {
+        use crate::cognition::grounding::{RealityTruthAnchor, GroundingVector, RealityEvidenceIntegrity};
+
+        let anchor = RealityTruthAnchor {
+            anchor_id: "a1".to_string(),
+            source_node: "n1".to_string(),
+            observed_at: 1000,
+            validity_half_life: 500.0, // 500 seconds half-life
+            grounding_vector: GroundingVector {
+                syntactic_confidence: 1.0,
+                behavioral_confidence: 1.0,
+                performance_confidence: 1.0,
+                replay_consistency: 1.0,
+                operator_confidence: 1.0,
+                environmental_stability: 1.0,
+                adversarial_resilience: 1.0,
+            },
+            integrity_seal: RealityEvidenceIntegrity {
+                evidence_signature: "s".to_string(), sandbox_isolation_hash: "a".to_string(), compiler_binary_fingerprint: "b".to_string()
+            },
+        };
+
+        // Check decay after 500 seconds (1 half-life elapsed) -> metrics should decay by half (0.50)
+        let decayed = anchor.calculate_decayed_vector(1500);
+        
+        assert_eq!(decayed.syntactic_confidence, 1.0); // Syntactic does not decay
+        assert_eq!(decayed.adversarial_resilience, 1.0); // Adversarial does not decay
+        
+        assert!((decayed.behavioral_confidence - 0.50).abs() < 0.001); // Decayed by half
+        assert!((decayed.operator_confidence - 0.50).abs() < 0.001); // Decayed by half
+    }
 }
+
