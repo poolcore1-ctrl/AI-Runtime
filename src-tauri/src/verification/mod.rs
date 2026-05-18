@@ -87,6 +87,8 @@ impl TruthLayer {
                         duration_ms: 0,
                         screenshot_hash: None,
                         error_details: Some(err.to_string()),
+                        behavioral_trace: None,
+                        invariants: Vec::new(),
                     });
                 }
             }
@@ -122,8 +124,11 @@ impl TruthLayer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::verification::agents::{BuildVerifier, ApiVerifier};
+    use crate::verification::agents::{
+        BuildVerifier, ApiVerifier, WorkflowVerifier, StateTransitionVerifier, PersistenceVerifier
+    };
     use crate::verification::playwright::PlaywrightRunner;
+    use crate::verification::types::{SemanticInvariant, VerificationSeverity, VerificationFingerprint};
 
     #[tokio::test]
     async fn test_truth_layer_consensus_flow() {
@@ -157,5 +162,120 @@ mod tests {
         assert_eq!(report_fail.results[0].node_id, "build_verifier");
         assert_eq!(report_fail.results[1].node_id, "api_verifier");
         assert!(!report_fail.results[1].passed);
+    }
+
+    #[tokio::test]
+    async fn test_workflow_verification_semantic_pass() {
+        let budget = Arc::new(VerificationBudgetManager::new(5000, 5));
+        let verifier = WorkflowVerifier::new(
+            "User Checkout Flow".to_string(),
+            vec!["authenticate".to_string(), "add_to_cart".to_string(), "checkout".to_string()],
+            vec![]
+        );
+
+        let res = verifier.verify(".", &budget).await.unwrap();
+        assert!(res.passed);
+        assert_eq!(res.fingerprint, VerificationFingerprint::Unknown);
+        
+        let trace = res.behavioral_trace.unwrap();
+        assert_eq!(trace.workflow_name, "User Checkout Flow");
+        assert_eq!(trace.steps_executed.len(), 3);
+        assert!(trace.success);
+    }
+
+    #[tokio::test]
+    async fn test_state_transition_reducer_governance() {
+        let budget = Arc::new(VerificationBudgetManager::new(5000, 5));
+        
+        // 1. Valid transitions
+        let valid_verifier = StateTransitionVerifier::new(
+            "todo".to_string(),
+            vec![("todo".to_string(), "in_progress".to_string()), ("in_progress".to_string(), "done".to_string())],
+            vec![]
+        );
+        let res_valid = valid_verifier.verify(".", &budget).await.unwrap();
+        assert!(res_valid.passed);
+        let trace = res_valid.behavioral_trace.unwrap();
+        assert_eq!(trace.state_transitions.len(), 2);
+        assert_eq!(trace.state_transitions[0], "todo -> in_progress");
+
+        // 2. Corrupted transitions
+        let corrupt_verifier = StateTransitionVerifier::new(
+            "todo".to_string(),
+            vec![],
+            vec![("always_corrupt".to_string(), "done".to_string())]
+        );
+        let res_corrupt = corrupt_verifier.verify(".", &budget).await.unwrap();
+        assert!(!res_corrupt.passed);
+        assert_eq!(res_corrupt.fingerprint, VerificationFingerprint::StateCorruption);
+    }
+
+    #[tokio::test]
+    async fn test_persistence_read_write_lifecycle() {
+        let budget = Arc::new(VerificationBudgetManager::new(5000, 5));
+        
+        // Stable persistence run
+        let stable_verifier = PersistenceVerifier::new("db_stable".to_string());
+        let res_stable = stable_verifier.verify(".", &budget).await.unwrap();
+        assert!(res_stable.passed);
+
+        // Broken persistence run
+        let broken_verifier = PersistenceVerifier::new("db_corrupt".to_string());
+        let res_broken = broken_verifier.verify(".", &budget).await.unwrap();
+        assert!(!res_broken.passed);
+        assert_eq!(res_broken.fingerprint, VerificationFingerprint::PersistenceFailure);
+    }
+
+    #[tokio::test]
+    async fn test_semantic_invariants_enforcement() {
+        let budget = Arc::new(VerificationBudgetManager::new(5000, 5));
+        
+        let cart_invariant = SemanticInvariant {
+            name: "cart total must never be negative".to_string(),
+            condition: "total_price >= 0.0".to_string(),
+            severity: VerificationSeverity::Major,
+        };
+
+        // Workflow violating invariant
+        let breach_invariant = SemanticInvariant {
+            name: "deleted task must not reappear".to_string(),
+            condition: "negative_task_count".to_string(), // Violates via mock trigger keyword
+            severity: VerificationSeverity::Major,
+        };
+
+        let verifier = WorkflowVerifier::new(
+            "Add Invalid Cart Discount".to_string(),
+            vec!["authenticate".to_string()],
+            vec![cart_invariant, breach_invariant]
+        );
+
+        let res = verifier.verify(".", &budget).await.unwrap();
+        assert!(!res.passed);
+        assert_eq!(res.fingerprint, VerificationFingerprint::InvariantBreach);
+    }
+
+    #[tokio::test]
+    async fn test_full_reality_consensus() {
+        let mut dag = VerificationDAG::new();
+
+        // Add compile, boot, E2E verifier
+        dag.add_agent(Arc::new(BuildVerifier::new("cargo --version".to_string())));
+        
+        // Add behavioral verifier
+        dag.add_agent(Arc::new(WorkflowVerifier::new(
+            "E2E Login Workflow".to_string(),
+            vec!["login".to_string()],
+            vec![]
+        )));
+
+        // Add persistence verifier
+        dag.add_agent(Arc::new(PersistenceVerifier::new("db_stable".to_string())));
+
+        let truth_layer = TruthLayer::new(dag);
+        let report = truth_layer.execute_reality_arbitration(".").await.unwrap();
+        
+        // All agents pass, so consensus passes
+        assert!(report.consensus_passed);
+        assert_eq!(report.results.len(), 3);
     }
 }

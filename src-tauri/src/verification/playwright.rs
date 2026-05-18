@@ -93,6 +93,8 @@ impl crate::verification::agents::VerificationAgent for PlaywrightRunner {
             duration_ms: duration.as_millis() as u64,
             screenshot_hash,
             error_details,
+            behavioral_trace: None,
+            invariants: Vec::new(),
         })
     }
 

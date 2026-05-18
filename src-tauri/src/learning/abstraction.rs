@@ -73,9 +73,9 @@ impl AbstractionEngine {
         }
 
         strategy.verification_surface_coverage = if has_e2e {
-            VerificationSurfaceCoverage::FullTruthLayer
+            VerificationSurfaceCoverage::FullRealityVerified
         } else if has_runtime {
-            VerificationSurfaceCoverage::BuildAndRuntime
+            VerificationSurfaceCoverage::RuntimeVerified
         } else {
             VerificationSurfaceCoverage::BuildOnly
         };

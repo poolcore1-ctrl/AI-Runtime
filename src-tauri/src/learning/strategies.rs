@@ -35,26 +35,32 @@ impl StrategyState {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum VerificationSurfaceCoverage {
     BuildOnly,
-    BuildAndRuntime,
-    FullTruthLayer,
+    RuntimeVerified,
+    UIVerified,
     BehavioralVerified,
+    PersistenceVerified,
+    FullRealityVerified,
 }
 
 impl VerificationSurfaceCoverage {
     pub fn as_str(&self) -> &'static str {
         match self {
             VerificationSurfaceCoverage::BuildOnly => "BuildOnly",
-            VerificationSurfaceCoverage::BuildAndRuntime => "BuildAndRuntime",
-            VerificationSurfaceCoverage::FullTruthLayer => "FullTruthLayer",
+            VerificationSurfaceCoverage::RuntimeVerified => "RuntimeVerified",
+            VerificationSurfaceCoverage::UIVerified => "UIVerified",
             VerificationSurfaceCoverage::BehavioralVerified => "BehavioralVerified",
+            VerificationSurfaceCoverage::PersistenceVerified => "PersistenceVerified",
+            VerificationSurfaceCoverage::FullRealityVerified => "FullRealityVerified",
         }
     }
 
     pub fn from_str(s: &str) -> Self {
         match s {
-            "BuildAndRuntime" => VerificationSurfaceCoverage::BuildAndRuntime,
-            "FullTruthLayer" => VerificationSurfaceCoverage::FullTruthLayer,
+            "RuntimeVerified" => VerificationSurfaceCoverage::RuntimeVerified,
+            "UIVerified" => VerificationSurfaceCoverage::UIVerified,
             "BehavioralVerified" => VerificationSurfaceCoverage::BehavioralVerified,
+            "PersistenceVerified" => VerificationSurfaceCoverage::PersistenceVerified,
+            "FullRealityVerified" => VerificationSurfaceCoverage::FullRealityVerified,
             _ => VerificationSurfaceCoverage::BuildOnly,
         }
     }

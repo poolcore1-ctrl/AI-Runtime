@@ -126,7 +126,7 @@ Index: src/main.rs
         assert!(strategy_res.is_ok());
         let strategy = strategy_res.unwrap();
         assert_eq!(strategy.state, StrategyState::Experimental);
-        assert_eq!(strategy.verification_surface_coverage, VerificationSurfaceCoverage::BuildAndRuntime);
+        assert_eq!(strategy.verification_surface_coverage, VerificationSurfaceCoverage::RuntimeVerified);
 
         // 2. Setup a suppressive trace report
         let mut suppressive_report = clean_report.clone();

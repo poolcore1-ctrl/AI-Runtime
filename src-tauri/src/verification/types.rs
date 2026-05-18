@@ -21,6 +21,10 @@ pub enum VerificationFingerprint {
     HydrationFailure,
     VisualLayoutShift,
     StaleDependencyBoot,
+    WorkflowFailure,
+    StateCorruption,
+    PersistenceFailure,
+    InvariantBreach,
     Unknown,
 }
 
@@ -39,10 +43,44 @@ impl VerificationFingerprint {
             VerificationFingerprint::ApiSchemaMismatch
         } else if l_lower.contains("dependency") || l_lower.contains("module not found") {
             VerificationFingerprint::StaleDependencyBoot
+        } else if l_lower.contains("workflow") || l_lower.contains("action failed") {
+            VerificationFingerprint::WorkflowFailure
+        } else if l_lower.contains("state corruption") || l_lower.contains("reducer error") || l_lower.contains("illegal transition") {
+            VerificationFingerprint::StateCorruption
+        } else if l_lower.contains("persistence") || l_lower.contains("db write") || l_lower.contains("acid mismatch") {
+            VerificationFingerprint::PersistenceFailure
+        } else if l_lower.contains("invariant") || l_lower.contains("violation") || l_lower.contains("breach") {
+            VerificationFingerprint::InvariantBreach
         } else {
             VerificationFingerprint::Unknown
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BehavioralTrace {
+    pub workflow_name: String,
+    pub steps_executed: Vec<String>,
+    pub state_transitions: Vec<String>,
+    pub duration_ms: u64,
+    pub success: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SemanticInvariant {
+    pub name: String,
+    pub condition: String,
+    pub severity: VerificationSeverity,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum BehavioralDrift {
+    None,
+    TimingVariance,
+    StateMismatch,
+    WorkflowDeviation,
+    PersistenceMismatch,
+    SemanticRegression,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,6 +110,8 @@ pub struct VerificationResult {
     pub duration_ms: u64,
     pub screenshot_hash: Option<String>,
     pub error_details: Option<String>,
+    pub behavioral_trace: Option<BehavioralTrace>,
+    pub invariants: Vec<SemanticInvariant>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
