@@ -7,6 +7,7 @@ pub mod runtime;
 pub mod learning;
 pub mod cognition;
 pub mod verification;
+pub mod stress_testing;
 
 use std::sync::Arc;
 use tauri::{Manager, Emitter};

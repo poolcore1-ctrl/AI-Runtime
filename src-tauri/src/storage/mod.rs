@@ -111,6 +111,35 @@ impl Storage {
             [],
         )?;
 
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS replay_manifests (
+                session_id TEXT PRIMARY KEY,
+                target_cwd TEXT NOT NULL,
+                snapshot_hash TEXT NOT NULL,
+                provider_chain TEXT NOT NULL,
+                prompt TEXT NOT NULL,
+                context_ids TEXT NOT NULL,
+                expected_outcome TEXT NOT NULL,
+                replay_fingerprint TEXT NOT NULL,
+                timestamp INTEGER NOT NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS black_box_records (
+                record_id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                reasoning_traces TEXT NOT NULL,
+                console_logs TEXT NOT NULL,
+                diff_patches TEXT NOT NULL,
+                mutations_journal TEXT NOT NULL,
+                screenshot_hashes TEXT NOT NULL,
+                timestamp INTEGER NOT NULL
+            )",
+            [],
+        )?;
+
         Ok(Self { conn: Mutex::new(conn) })
     }
 }
