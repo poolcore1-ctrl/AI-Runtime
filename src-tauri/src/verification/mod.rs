@@ -121,6 +121,36 @@ impl TruthLayer {
     }
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+pub struct SpeculativeBranchReport {
+    pub provider_name: String,
+    pub compilation_success: bool,
+    pub semantic_preservation_score: f64,
+    pub invariants_passed: bool,
+    pub behavioral_drift_score: f64,
+}
+
+pub struct GraphTruthLayer {
+    pub base_layer: TruthLayer,
+}
+
+impl GraphTruthLayer {
+    pub fn new(base_layer: TruthLayer) -> Self {
+        Self { base_layer }
+    }
+
+    pub fn arbitrate_branches(&self, branches: &[SpeculativeBranchReport]) -> Option<SpeculativeBranchReport> {
+        branches.iter()
+            .filter(|b| b.invariants_passed && b.compilation_success)
+            .max_by(|a, b| {
+                let score_a = a.semantic_preservation_score - a.behavioral_drift_score * 0.5;
+                let score_b = b.semantic_preservation_score - b.behavioral_drift_score * 0.5;
+                score_a.partial_cmp(&score_b).unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .cloned()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

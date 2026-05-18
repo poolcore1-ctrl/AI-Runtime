@@ -121,6 +121,10 @@ impl Storage {
                 context_ids TEXT NOT NULL,
                 expected_outcome TEXT NOT NULL,
                 replay_fingerprint TEXT NOT NULL,
+                ir_version TEXT NOT NULL DEFAULT '3.8',
+                semantic_hash TEXT NOT NULL DEFAULT '',
+                provider_name TEXT NOT NULL DEFAULT '',
+                compiled_prompt_hash TEXT NOT NULL DEFAULT '',
                 timestamp INTEGER NOT NULL
             )",
             [],
@@ -135,6 +139,223 @@ impl Storage {
                 diff_patches TEXT NOT NULL,
                 mutations_journal TEXT NOT NULL,
                 screenshot_hashes TEXT NOT NULL,
+                timestamp INTEGER NOT NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cognitive_graphs (
+                graph_id TEXT PRIMARY KEY,
+                graph_hash TEXT NOT NULL,
+                root_node TEXT NOT NULL,
+                entropy_class TEXT NOT NULL,
+                created_at INTEGER NOT NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS graph_nodes (
+                node_id TEXT PRIMARY KEY,
+                graph_id TEXT NOT NULL,
+                node_type TEXT NOT NULL,
+                execution_state TEXT NOT NULL,
+                provider_profile TEXT
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS graph_edges (
+                edge_id TEXT PRIMARY KEY,
+                graph_id TEXT NOT NULL,
+                from_node TEXT NOT NULL,
+                to_node TEXT NOT NULL,
+                condition TEXT NOT NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS graph_execution_metrics (
+                node_id TEXT PRIMARY KEY,
+                node_type TEXT NOT NULL,
+                provider_name TEXT NOT NULL,
+                duration_ms INTEGER NOT NULL,
+                input_tokens INTEGER NOT NULL,
+                output_tokens INTEGER NOT NULL,
+                cost_usd REAL NOT NULL,
+                success INTEGER NOT NULL,
+                verifier_roi REAL NOT NULL,
+                semantic_contribution REAL NOT NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS graph_motifs (
+                motif_id TEXT PRIMARY KEY,
+                problem_archetype TEXT NOT NULL,
+                success_count INTEGER NOT NULL,
+                avg_cost_usd REAL NOT NULL,
+                avg_latency_ms INTEGER NOT NULL,
+                semantic_success_rate REAL NOT NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS graph_optimization_events (
+                event_id TEXT PRIMARY KEY,
+                original_graph_hash TEXT NOT NULL,
+                optimized_graph_hash TEXT NOT NULL,
+                pruned_nodes TEXT NOT NULL,
+                compressed_subgraphs TEXT NOT NULL,
+                timestamp INTEGER NOT NULL
+            )",
+            [],
+        )?;
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cognitive_memory_hot (
+                memory_id TEXT PRIMARY KEY,
+                repository_fingerprint TEXT NOT NULL,
+                task_category TEXT NOT NULL,
+                entropy_class TEXT NOT NULL,
+                graph_hash TEXT NOT NULL,
+                semantic_hash TEXT NOT NULL,
+                verification_outcome TEXT NOT NULL,
+                behavioral_drift_score REAL NOT NULL,
+                execution_cost_usd REAL NOT NULL,
+                timestamp INTEGER NOT NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS longitudinal_summaries_cold (
+                summary_id TEXT PRIMARY KEY,
+                total_runs INTEGER NOT NULL,
+                avg_success_rate REAL NOT NULL,
+                avg_cost REAL NOT NULL,
+                dominant_failure_class TEXT NOT NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS repository_identities (
+                repository_fingerprint TEXT PRIMARY KEY,
+                entropy_baseline TEXT NOT NULL,
+                architectural_fragility_score REAL NOT NULL,
+                behavioral_instability_score REAL NOT NULL,
+                persistence_reliability_score REAL NOT NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS provider_drift_vectors (
+                provider_name TEXT PRIMARY KEY,
+                reasoning_stability REAL NOT NULL,
+                constraint_preservation REAL NOT NULL,
+                replay_determinism REAL NOT NULL,
+                behavioral_accuracy REAL NOT NULL,
+                persistence_reliability REAL NOT NULL,
+                token_efficiency REAL NOT NULL,
+                latency_consistency REAL NOT NULL,
+                longitudinal_stability_score REAL NOT NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS motif_lineage (
+                motif_id TEXT PRIMARY KEY,
+                parent_motif TEXT,
+                generation INTEGER NOT NULL,
+                mutation_reason TEXT NOT NULL,
+                success_delta REAL NOT NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cognitive_reputations (
+                entity_id TEXT PRIMARY KEY,
+                trust_score REAL NOT NULL,
+                semantic_accuracy REAL NOT NULL,
+                replay_stability REAL NOT NULL,
+                drift_rate REAL NOT NULL
+            )",
+            [],
+        )?;
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cognitive_beliefs (
+                belief_id TEXT PRIMARY KEY,
+                statement TEXT NOT NULL,
+                confidence REAL NOT NULL,
+                temporal_stability REAL NOT NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS epistemic_contradictions (
+                contradiction_id TEXT PRIMARY KEY,
+                class TEXT NOT NULL,
+                risk_level TEXT NOT NULL,
+                resolution_action TEXT NOT NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cognitive_audit_logs (
+                audit_id TEXT PRIMARY KEY,
+                decision_context TEXT NOT NULL,
+                violated_laws TEXT NOT NULL,
+                timestamp INTEGER NOT NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cognitive_pathologies (
+                pathology_id TEXT PRIMARY KEY,
+                pathology_class TEXT NOT NULL,
+                severity REAL NOT NULL,
+                detected_timestamp INTEGER NOT NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS immune_responses (
+                response_id TEXT PRIMARY KEY,
+                pathology_id TEXT NOT NULL,
+                response_type TEXT NOT NULL,
+                success BOOLEAN NOT NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cognitive_physiology (
+                snapshot_id TEXT PRIMARY KEY,
+                entropy_pressure REAL NOT NULL,
+                contradiction_density REAL NOT NULL,
+                memory_saturation REAL NOT NULL,
+                timestamp INTEGER NOT NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cognitive_energy (
+                cycle_id TEXT PRIMARY KEY,
+                consumed_energy REAL NOT NULL,
+                recovery_rate REAL NOT NULL,
                 timestamp INTEGER NOT NULL
             )",
             [],

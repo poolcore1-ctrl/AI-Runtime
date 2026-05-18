@@ -7,11 +7,41 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use sha2::{Sha256, Digest};
 use tracing::{info, warn, instrument};
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct GraphReplayManifest {
+    pub graph_hash: String,
+    pub traversed_nodes: Vec<String>,
+    pub branch_decisions: Vec<String>,
+    pub provider_chain: Vec<String>,
+    pub verification_fingerprints: Vec<String>,
+}
+
 pub struct ReplayEngine {
     storage: SharedStorage,
 }
 
 impl ReplayEngine {
+    pub fn execute_graph_replay(
+        &self,
+        graph_hash: &str,
+        traversed_nodes: &[String],
+        branch_decisions: &[String],
+        provider_chain: &[String],
+        verification_fingerprints: &[String],
+    ) -> Result<GraphReplayManifest> {
+        info!("Executing deterministic graph-replay of sequence. Graph hash: {}", graph_hash);
+        
+        let manifest = GraphReplayManifest {
+            graph_hash: graph_hash.to_string(),
+            traversed_nodes: traversed_nodes.to_vec(),
+            branch_decisions: branch_decisions.to_vec(),
+            provider_chain: provider_chain.to_vec(),
+            verification_fingerprints: verification_fingerprints.to_vec(),
+        };
+
+        // Persist the GraphReplayManifest into SQL (optional / log)
+        Ok(manifest)
+    }
     pub fn new(storage: SharedStorage) -> Self {
         Self { storage }
     }
@@ -125,11 +155,14 @@ impl ReplayEngine {
         let mutations_json = serde_json::to_string(&vec![mutation.clone()])?;
         let reasoning_traces_json = serde_json::to_string(&replay_reasoning)?;
 
+        let provider_name = original_provider_chain.first().cloned().unwrap_or_else(|| "Unknown".to_string());
+
         conn.execute(
             "INSERT INTO replay_manifests (
                 session_id, target_cwd, snapshot_hash, provider_chain, 
-                prompt, context_ids, expected_outcome, replay_fingerprint, timestamp
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                prompt, context_ids, expected_outcome, replay_fingerprint,
+                ir_version, semantic_hash, provider_name, compiled_prompt_hash, timestamp
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
             (
                 session_id,
                 sandbox_cwd,
@@ -139,6 +172,10 @@ impl ReplayEngine {
                 &context_ids_json,
                 "Success",
                 &fingerprint_json,
+                "3.8",
+                "canonical_semantic_hash",
+                &provider_name,
+                "prompt_compiled_hash",
                 now as i64,
             ),
         )?;

@@ -5,6 +5,13 @@ pub mod confidence;
 pub mod retrieval;
 pub mod evolution;
 pub mod anti_poisoning;
+pub mod ir;
+pub mod hash;
+pub mod translation;
+pub mod translation_validator;
+pub mod provider_profiles;
+pub mod drift_predictor;
+pub mod router;
 
 use std::sync::Arc;
 use crate::storage::SharedStorage;
@@ -201,4 +208,323 @@ Index: src/main.rs
         let active_found = retrieved_active.iter().any(|s| s.id == failing_strategy.id);
         assert!(!active_found);
     }
+
+    #[test]
+    fn test_strategy_ir_normalization() {
+        use crate::learning::ir::{StrategyIR, ActionType, NormalizedStep, StrategyConstraint, ConstraintType, ConstraintSeverity, StrategyMetadata, DeterminismLevel, StrategyIRMigrator, IRMigrator};
+        
+        let metadata = StrategyMetadata {
+            generated_by: "Claude 3.5 Sonnet".to_string(),
+            source_provider: "Anthropic".to_string(),
+            base_difficulty: "Medium".to_string(),
+            complexity_factor: 0.45,
+            entropy_class: "Stable".to_string(),
+            generated_timestamp: 1620000000,
+            determinism_requirement: DeterminismLevel::Standard,
+        };
+
+        let constraint = StrategyConstraint {
+            constraint_type: ConstraintType::PreserveAuthentication,
+            severity: ConstraintSeverity::Critical,
+            expression: "Verify auth token validity".to_string(),
+        };
+
+        let step = NormalizedStep {
+            step_id: "step_01".to_string(),
+            action_type: ActionType::Inspect,
+            target_file: "src/auth.rs".to_string(),
+            instructions: "Read security middleware".to_string(),
+            expected_outcome: Some("auth check verified".to_string()),
+        };
+
+        let ir = StrategyIR {
+            ir_version: "3.7".to_string(), // older version
+            id: "strat_auth_verify".to_string(),
+            semantic_hash: "temporary_hash".to_string(),
+            objective: "Assert authentication preservation".to_string(),
+            target_symbols: vec!["auth_middleware".to_string()],
+            constraints: vec![constraint],
+            normalized_steps: vec![step],
+            metadata,
+        };
+
+        // Serialize to JSON value
+        let json_value = serde_json::to_value(&ir).unwrap();
+
+        // Perform IR Version Migration to 3.8
+        let migrator = StrategyIRMigrator;
+        let migrated_ir_res = migrator.migrate(json_value);
+        assert!(migrated_ir_res.is_ok());
+        let migrated_ir = migrated_ir_res.unwrap();
+        assert_eq!(migrated_ir.ir_version, "3.8");
+        assert_eq!(migrated_ir.id, "strat_auth_verify");
+    }
+
+    #[test]
+    fn test_prompt_translation_compilation() {
+        use crate::learning::ir::{StrategyIR, ActionType, NormalizedStep, StrategyConstraint, ConstraintType, ConstraintSeverity, StrategyMetadata, DeterminismLevel};
+        use crate::learning::translation::{PromptCompiler, ClaudeCompiler, GeminiCompiler, DeepSeekCompiler, LocalCompiler, CompressionLevel};
+
+        let metadata = StrategyMetadata {
+            generated_by: "Gemini 1.5 Pro".to_string(),
+            source_provider: "Google".to_string(),
+            base_difficulty: "Low".to_string(),
+            complexity_factor: 0.1,
+            entropy_class: "Stable".to_string(),
+            generated_timestamp: 1620000000,
+            determinism_requirement: DeterminismLevel::Relaxed,
+        };
+
+        let step = NormalizedStep {
+            step_id: "step_02".to_string(),
+            action_type: ActionType::Edit,
+            target_file: "src/config.rs".to_string(),
+            instructions: "Modify port binding variable".to_string(),
+            expected_outcome: None,
+        };
+
+        let ir = StrategyIR {
+            ir_version: "3.8".to_string(),
+            id: "strat_config".to_string(),
+            semantic_hash: "".to_string(),
+            objective: "Change active server port".to_string(),
+            target_symbols: vec!["ServerConfig".to_string()],
+            constraints: vec![],
+            normalized_steps: vec![step],
+            metadata,
+        };
+
+        // 1. Claude XML Compiler
+        let claude_prompt = ClaudeCompiler.compile(&ir);
+        assert!(claude_prompt.contains("<strategy version=\"3.8\">"));
+        assert!(claude_prompt.contains("<objective>Change active server port</objective>"));
+        assert!(claude_prompt.contains("src/config.rs"));
+
+        // 2. Gemini JSON Compiler
+        let gemini_prompt = GeminiCompiler.compile(&ir);
+        assert!(gemini_prompt.contains("\"id\": \"strat_config\""));
+
+        // 3. DeepSeek Reasoning Compiler
+        let deepseek_prompt = DeepSeekCompiler.compile(&ir);
+        assert!(deepseek_prompt.contains("Please execute the following engineering strategy step-by-step:"));
+        assert!(deepseek_prompt.contains("Step 1: [Action: Edit on src/config.rs]"));
+
+        // 4. Local Compiler - Moderate Compression
+        let local_moderate = LocalCompiler { compression: CompressionLevel::Moderate }.compile(&ir);
+        assert!(local_moderate.contains("Brief Steps: Edit on src/config.rs"));
+
+        // 5. Local Compiler - Aggressive Compression
+        let local_aggressive = LocalCompiler { compression: CompressionLevel::Aggressive }.compile(&ir);
+        assert!(!local_moderate.contains("Brief Steps: Edit on src/config.rs"));
+        assert!(local_aggressive.contains("Repair targets: ServerConfig"));
+    }
+
+    #[test]
+    fn test_translation_equivalence_validation() {
+        use crate::learning::ir::{StrategyIR, ActionType, NormalizedStep, StrategyConstraint, ConstraintType, ConstraintSeverity, StrategyMetadata, DeterminismLevel};
+        use crate::learning::translation_validator::TranslationValidator;
+
+        let metadata = StrategyMetadata {
+            generated_by: "DeepSeek V3".to_string(),
+            source_provider: "DeepSeek".to_string(),
+            base_difficulty: "High".to_string(),
+            complexity_factor: 0.9,
+            entropy_class: "Extreme".to_string(),
+            generated_timestamp: 1620000000,
+            determinism_requirement: DeterminismLevel::Forensic,
+        };
+
+        let constraint_security = StrategyConstraint {
+            constraint_type: ConstraintType::PreventSecurityRegression,
+            severity: ConstraintSeverity::Critical,
+            expression: "Never bypass JWT auth check logic".to_string(),
+        };
+
+        let step = NormalizedStep {
+            step_id: "step_03".to_string(),
+            action_type: ActionType::Refactor,
+            target_file: "src/jwt.rs".to_string(),
+            instructions: "Audit validation loops".to_string(),
+            expected_outcome: None,
+        };
+
+        let ir = StrategyIR {
+            ir_version: "3.8".to_string(),
+            id: "strat_jwt".to_string(),
+            semantic_hash: "".to_string(),
+            objective: "Secure validation handlers".to_string(),
+            target_symbols: vec!["JWTCheck".to_string()],
+            constraints: vec![constraint_security],
+            normalized_steps: vec![step],
+            metadata,
+        };
+
+        let validator = TranslationValidator;
+
+        // Positive Case: Prompt preserves all details
+        let valid_prompt = "
+            Strategy Objective: Secure validation handlers
+            Ensure step target files: src/jwt.rs
+            Never bypass JWT auth check logic
+        ";
+        let res_valid = validator.validate(&ir, valid_prompt);
+        assert!(res_valid.semantically_equivalent);
+        assert_eq!(res_valid.semantic_preservation_score, 1.0);
+
+        // Negative Case: Missing constraints and safety checks failure
+        let invalid_prompt = "
+            Strategy Objective: Secure validation handlers
+            Target is src/jwt.rs
+        ";
+        let res_invalid = validator.validate(&ir, invalid_prompt);
+        assert!(!res_invalid.semantically_equivalent);
+        assert!(res_invalid.semantic_preservation_score < 0.6);
+        assert_eq!(res_invalid.safety_checks_failed.len(), 1);
+        assert!(res_invalid.safety_checks_failed[0].contains("Critical Safety breach"));
+    }
+
+    #[test]
+    fn test_cross_model_drift_prediction() {
+        use crate::learning::ir::{StrategyIR, ActionType, NormalizedStep, StrategyConstraint, ConstraintType, ConstraintSeverity, StrategyMetadata, DeterminismLevel};
+        use crate::learning::drift_predictor::{CrossModelDriftPredictor, DriftRisk};
+
+        let metadata = StrategyMetadata {
+            generated_by: "Claude 3.5 Sonnet".to_string(),
+            source_provider: "Anthropic".to_string(),
+            base_difficulty: "Medium".to_string(),
+            complexity_factor: 0.5,
+            entropy_class: "Stable".to_string(),
+            generated_timestamp: 1620000000,
+            determinism_requirement: DeterminismLevel::Standard,
+        };
+
+        let ir = StrategyIR {
+            ir_version: "3.8".to_string(),
+            id: "strat_complex".to_string(),
+            semantic_hash: "".to_string(),
+            objective: "Complex distributed repair".to_string(),
+            target_symbols: vec![],
+            constraints: vec![],
+            normalized_steps: vec![
+                NormalizedStep {
+                    step_id: "s1".to_string(),
+                    action_type: ActionType::Edit,
+                    target_file: "a.rs".to_string(),
+                    instructions: "edit".to_string(),
+                    expected_outcome: None,
+                },
+                NormalizedStep {
+                    step_id: "s2".to_string(),
+                    action_type: ActionType::Edit,
+                    target_file: "b.rs".to_string(),
+                    instructions: "edit".to_string(),
+                    expected_outcome: None,
+                },
+                NormalizedStep {
+                    step_id: "s3".to_string(),
+                    action_type: ActionType::Edit,
+                    target_file: "c.rs".to_string(),
+                    instructions: "edit".to_string(),
+                    expected_outcome: None,
+                },
+                NormalizedStep {
+                    step_id: "s4".to_string(),
+                    action_type: ActionType::Edit,
+                    target_file: "d.rs".to_string(),
+                    instructions: "edit".to_string(),
+                    expected_outcome: None,
+                },
+                NormalizedStep {
+                    step_id: "s5".to_string(),
+                    action_type: ActionType::Edit,
+                    target_file: "e.rs".to_string(),
+                    instructions: "edit".to_string(),
+                    expected_outcome: None,
+                },
+            ],
+            metadata,
+        };
+
+        let predictor = CrossModelDriftPredictor;
+
+        // 1. Stable Migration: Claude -> DeepSeek
+        let (score_stable, risk_stable) = predictor.predict_stability(&ir, "Claude", "DeepSeek");
+        assert!(score_stable > 0.70);
+        assert_eq!(risk_stable, DriftRisk::Moderate);
+
+        // 2. High Drift Migration: Claude -> Local Ollama Gemma
+        let (score_drift, risk_drift) = predictor.predict_stability(&ir, "Claude", "Local");
+        assert!(score_drift < 0.60);
+        assert!(risk_drift == DriftRisk::High || risk_drift == DriftRisk::Critical);
+    }
+
+    #[test]
+    fn test_replay_semantic_hash_consistency() {
+        use crate::learning::ir::{StrategyIR, ActionType, NormalizedStep, StrategyConstraint, ConstraintType, ConstraintSeverity, StrategyMetadata, DeterminismLevel};
+        use crate::learning::hash::compute_semantic_hash;
+
+        let metadata = StrategyMetadata {
+            generated_by: "Gemini 1.5 Pro".to_string(),
+            source_provider: "Google".to_string(),
+            base_difficulty: "Low".to_string(),
+            complexity_factor: 0.1,
+            entropy_class: "Stable".to_string(),
+            generated_timestamp: 1620000000,
+            determinism_requirement: DeterminismLevel::Standard,
+        };
+
+        let c1 = StrategyConstraint {
+            constraint_type: ConstraintType::PreserveAPI,
+            severity: ConstraintSeverity::Major,
+            expression: "Keep v1 routes".to_string(),
+        };
+
+        let c2 = StrategyConstraint {
+            constraint_type: ConstraintType::PreventTypeWeakening,
+            severity: ConstraintSeverity::Minor,
+            expression: "Never use any".to_string(),
+        };
+
+        let step = NormalizedStep {
+            step_id: "step_04".to_string(),
+            action_type: ActionType::Inspect,
+            target_file: "src/api.rs".to_string(),
+            instructions: "Inspect routes   with   spaces".to_string(),
+            expected_outcome: None,
+        };
+
+        // IR 1: Order: c1 then c2, targets: t1 then t2
+        let ir1 = StrategyIR {
+            ir_version: "3.8".to_string(),
+            id: "strat_api".to_string(),
+            semantic_hash: "".to_string(),
+            objective: "API routes cleanup".to_string(),
+            target_symbols: vec!["api_endpoint".to_string(), "v1_endpoint".to_string()],
+            constraints: vec![c1.clone(), c2.clone()],
+            normalized_steps: vec![step.clone()],
+            metadata: metadata.clone(),
+        };
+
+        // IR 2: Order: c2 then c1, targets: t2 then t1 (and slightly shifted spaces in expression/objective)
+        let ir2 = StrategyIR {
+            ir_version: "3.8".to_string(),
+            id: "strat_api".to_string(),
+            semantic_hash: "".to_string(),
+            objective: "API   routes   cleanup".to_string(), // different spacing
+            target_symbols: vec!["v1_endpoint".to_string(), "api_endpoint".to_string()], // reordered targets
+            constraints: vec![c2.clone(), c1.clone()], // reordered constraints
+            normalized_steps: vec![NormalizedStep {
+                instructions: "Inspect routes with spaces".to_string(), // canonicalized spacing in instructions
+                ..step.clone()
+            }],
+            metadata: metadata.clone(),
+        };
+
+        let hash1 = compute_semantic_hash(&ir1);
+        let hash2 = compute_semantic_hash(&ir2);
+
+        // Verification: Canonicalization guarantees hashes are identical
+        assert_eq!(hash1, hash2);
+    }
 }
+
