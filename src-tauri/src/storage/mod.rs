@@ -438,6 +438,30 @@ impl Storage {
             [],
         )?;
 
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cognitive_specialists (
+                specialist_id TEXT PRIMARY KEY,
+                domain TEXT NOT NULL,
+                expertise_weight REAL NOT NULL,
+                fatigue REAL NOT NULL,
+                vital_energy REAL NOT NULL,
+                timestamp INTEGER NOT NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cognitive_treaties (
+                treaty_id TEXT PRIMARY KEY,
+                party_a TEXT NOT NULL,
+                party_b TEXT NOT NULL,
+                trust_score REAL NOT NULL,
+                terms_json TEXT NOT NULL,
+                timestamp INTEGER NOT NULL
+            )",
+            [],
+        )?;
+
         Ok(Self { conn: Mutex::new(conn) })
     }
 
@@ -627,6 +651,56 @@ impl Storage {
                 reality_delta = excluded.reality_delta,
                 timestamp = excluded.timestamp",
             (causal_id, expected_confidence, reality_delta, timestamp),
+        )?;
+        Ok(())
+    }
+
+    pub fn save_specialist(
+        &self,
+        specialist_id: &str,
+        domain: &str,
+        expertise_weight: f64,
+        fatigue: f64,
+        vital_energy: f64,
+        timestamp: i64,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO cognitive_specialists (
+                specialist_id, domain, expertise_weight, fatigue, vital_energy, timestamp
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT(specialist_id) DO UPDATE SET
+                domain = excluded.domain,
+                expertise_weight = excluded.expertise_weight,
+                fatigue = excluded.fatigue,
+                vital_energy = excluded.vital_energy,
+                timestamp = excluded.timestamp",
+            (specialist_id, domain, expertise_weight, fatigue, vital_energy, timestamp),
+        )?;
+        Ok(())
+    }
+
+    pub fn save_treaty(
+        &self,
+        treaty_id: &str,
+        party_a: &str,
+        party_b: &str,
+        trust_score: f64,
+        terms_json: &str,
+        timestamp: i64,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO cognitive_treaties (
+                treaty_id, party_a, party_b, trust_score, terms_json, timestamp
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT(treaty_id) DO UPDATE SET
+                party_a = excluded.party_a,
+                party_b = excluded.party_b,
+                trust_score = excluded.trust_score,
+                terms_json = excluded.terms_json,
+                timestamp = excluded.timestamp",
+            (treaty_id, party_a, party_b, trust_score, terms_json, timestamp),
         )?;
         Ok(())
     }

@@ -51,6 +51,11 @@ pub mod causal_physics;
 pub mod causal_resonance;
 pub mod causal_decay;
 pub mod global_compression;
+pub mod specialist;
+pub mod treaty;
+pub mod consensus_mesh;
+pub mod federation;
+
 
 
 
@@ -1741,6 +1746,158 @@ mod tests {
 
         // 3. Normal adaptability
         assert_eq!(arbitrator.arbitrate_regulators(0.10, 0.20, 0.20), "Adapt");
+    }
+
+    #[test]
+    fn test_specialist_localized_homeostasis() {
+        use crate::cognition::specialist::SpecialistCognition;
+        use crate::cognition::specialist::SpecialistDomain;
+
+        let mut spec = SpecialistCognition::new(
+            "spec_performance".to_string(),
+            SpecialistDomain::Performance,
+            0.80,
+            0.50,
+        );
+
+        assert_eq!(spec.fatigue, 0.0);
+        assert_eq!(spec.vital_energy, 1.0);
+
+        // Tick workload stress -> increases fatigue, decreases energy
+        spec.tick_physiology(2.0);
+        assert!((spec.fatigue - 0.30).abs() < 0.001);
+        assert!((spec.vital_energy - 0.84).abs() < 0.001);
+
+        // Rest -> decreases fatigue, increases energy
+        spec.rest_physiology(1.0);
+        assert!((spec.fatigue - 0.10).abs() < 0.001);
+        assert!((spec.vital_energy - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_consensus_mesh_weighted_voting() {
+        use crate::cognition::consensus_mesh::ConsensusMesh;
+        use crate::cognition::specialist::SpecialistDomain;
+
+        let mesh = ConsensusMesh::new();
+
+        // 1. Regular weighted vote
+        let votes = vec![
+            (SpecialistDomain::Performance, 0.80, true),
+            (SpecialistDomain::Concurrency, 0.60, false),
+        ];
+        let (approved, margin) = mesh.run_weighted_voting("prop_001", &votes);
+        assert_eq!(approved, true); // 0.80 / 1.40 = 0.57 >= 0.50
+        assert!((margin - 0.5714).abs() < 0.001);
+
+        // 2. Absolute veto via Security rejection override
+        let veto_votes = vec![
+            (SpecialistDomain::Performance, 0.90, true),
+            (SpecialistDomain::Security, 1.0, false), // Veto!
+        ];
+        let (approved_veto, _) = mesh.run_weighted_voting("prop_002", &veto_votes);
+        assert_eq!(approved_veto, false);
+    }
+
+    #[test]
+    fn test_treaty_arbitration_veto() {
+        use crate::cognition::treaty::{ArbitrationDecision, TreatyViolation, CognitiveTreaty};
+        use crate::cognition::specialist::{SpecialistDomain, SpecialistCognition};
+
+        let violation = TreatyViolation {
+            violation_id: "viol_001".to_string(),
+            violator: SpecialistDomain::Performance,
+            compromised_rule: "Never bypass safety gates".to_string(),
+            timestamp: 1716000000,
+        };
+
+        let perf = SpecialistCognition::new("perf".to_string(), SpecialistDomain::Performance, 0.80, 0.50);
+        let sec = SpecialistCognition::new("sec".to_string(), SpecialistDomain::Security, 1.0, 0.05);
+
+        // 1. Supreme Arbitration with Security involved -> absolute veto wins
+        let arb = ArbitrationDecision::arbitrate_dispute(&violation, &perf.capability, &sec.capability);
+        assert_eq!(arb.winning_party, SpecialistDomain::Security);
+        assert_eq!(arb.veto_asserted, true);
+
+        // 2. Diplomacy trust risk evaluation
+        let treaty = CognitiveTreaty::new(
+            "treaty_perf_concur".to_string(),
+            SpecialistDomain::Performance,
+            SpecialistDomain::Concurrency,
+            0.60, // 40% trust discount
+        );
+        let risk = treaty.evaluate_interaction_risk(0.80);
+        // expected: 0.80 * (1.0 - 0.60) = 0.32
+        assert!((risk - 0.32).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_localized_trait_corridors() {
+        use crate::cognition::specialist::SpecialistCognition;
+        use crate::cognition::specialist::SpecialistDomain;
+
+        let perf = SpecialistCognition::new(
+            "spec_perf".to_string(),
+            SpecialistDomain::Performance,
+            0.80,
+            0.50, // 50% max allocation drift allowed
+        );
+
+        assert_eq!(perf.capability.corridor.max_allocation_drift, 0.50);
+        assert_eq!(perf.capability.corridor.forbidden_modules[0], "unsafe_bypass");
+    }
+
+    #[test]
+    fn test_coalition_drift_detection() {
+        use crate::cognition::consensus_mesh::CoalitionDriftDetector;
+        use crate::cognition::specialist::SpecialistDomain;
+
+        let detector = CoalitionDriftDetector::new();
+        let correlations = vec![
+            (SpecialistDomain::Performance, SpecialistDomain::Telemetry, 0.40),
+            (SpecialistDomain::Concurrency, SpecialistDomain::Compiler, 0.92), // Drift!
+        ];
+
+        let drift = detector.detect_coalition_drift(&correlations);
+        assert!(drift.is_some());
+        let (party_a, party_b) = drift.unwrap();
+        assert_eq!(party_a, SpecialistDomain::Concurrency);
+        assert_eq!(party_b, SpecialistDomain::Compiler);
+    }
+
+    #[test]
+    fn test_federated_topology_persistence() {
+        use crate::storage::Storage;
+
+        let db_path = std::env::temp_dir().join("test_federated.db");
+        if db_path.exists() {
+            let _ = std::fs::remove_file(&db_path);
+        }
+        let storage = Storage::new(db_path.to_str().unwrap()).unwrap();
+
+        // 1. Verify specialist DB persistence
+        let save_spec = storage.save_specialist(
+            "spec_sec",
+            "Security",
+            1.0,
+            0.15,
+            0.95,
+            1716000000,
+        );
+        assert!(save_spec.is_ok());
+
+        // 2. Verify cognitive treaty DB persistence
+        let save_treaty = storage.save_treaty(
+            "treaty_sec_perf",
+            "Security",
+            "Performance",
+            0.95,
+            r#"["Cooperate on memory pools"]"#,
+            1716000000,
+        );
+        assert!(save_treaty.is_ok());
+
+        let _ = std::fs::remove_file(&db_path);
     }
 }
 
