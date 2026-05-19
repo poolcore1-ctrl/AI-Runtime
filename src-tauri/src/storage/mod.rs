@@ -404,6 +404,19 @@ impl Storage {
             [],
         )?;
 
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cognitive_causal_transitions (
+                transition_id TEXT PRIMARY KEY,
+                source_state TEXT NOT NULL,
+                triggering_action TEXT NOT NULL,
+                target_state TEXT NOT NULL,
+                causal_effect_class TEXT NOT NULL,
+                stats_json TEXT NOT NULL,
+                timestamp INTEGER NOT NULL
+            )",
+            [],
+        )?;
+
         Ok(Self { conn: Mutex::new(conn) })
     }
 
@@ -522,6 +535,33 @@ impl Storage {
                 duration_ms = excluded.duration_ms,
                 timestamp = excluded.timestamp",
             (profile_id, source_node, context_envelope_json, duration_ms, timestamp),
+        )?;
+        Ok(())
+    }
+
+    pub fn save_causal_transition(
+        &self,
+        transition_id: &str,
+        source_state: &str,
+        triggering_action: &str,
+        target_state: &str,
+        causal_effect_class: &str,
+        stats_json: &str,
+        timestamp: i64,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO cognitive_causal_transitions (
+                transition_id, source_state, triggering_action, target_state, causal_effect_class, stats_json, timestamp
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+             ON CONFLICT(transition_id) DO UPDATE SET
+                source_state = excluded.source_state,
+                triggering_action = excluded.triggering_action,
+                target_state = excluded.target_state,
+                causal_effect_class = excluded.causal_effect_class,
+                stats_json = excluded.stats_json,
+                timestamp = excluded.timestamp",
+            (transition_id, source_state, triggering_action, target_state, causal_effect_class, stats_json, timestamp),
         )?;
         Ok(())
     }

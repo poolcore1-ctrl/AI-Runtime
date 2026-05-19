@@ -43,6 +43,11 @@ pub mod compiler_driver;
 pub mod sandbox_driver;
 pub mod telemetry;
 pub mod human_gate;
+pub mod causal;
+pub mod causal_structural;
+pub mod causal_temporal;
+pub mod causal_counterfactual;
+
 
 
 
@@ -1431,6 +1436,191 @@ mod tests {
         
         assert!((decayed.behavioral_confidence - 0.50).abs() < 0.001); // Decayed by half
         assert!((decayed.operator_confidence - 0.50).abs() < 0.001); // Decayed by half
+    }
+
+    #[test]
+    fn test_causal_uncertainty_compounding() {
+        use crate::cognition::causal::{CausalGraph, CausalTransition, CausalEffectClass};
+
+        let graph = CausalGraph::new();
+
+        let t1 = CausalTransition {
+            source_state: "A".to_string(), triggering_action: "act1".to_string(), target_state: "B".to_string(),
+            causal_effect_class: CausalEffectClass::Neutral, propagation_probability: 0.80, temporal_latency_ms: None,
+            affected_invariants: Vec::new(), downstream_risk_score: 0.10, reversibility: 0.90, confidence: 0.80,
+            causal_uncertainty: 0.20,
+        };
+
+        let t2 = CausalTransition {
+            source_state: "B".to_string(), triggering_action: "act2".to_string(), target_state: "C".to_string(),
+            causal_effect_class: CausalEffectClass::Neutral, propagation_probability: 0.70, temporal_latency_ms: None,
+            affected_invariants: Vec::new(), downstream_risk_score: 0.15, reversibility: 0.85, confidence: 0.70,
+            causal_uncertainty: 0.30,
+        };
+
+        let compounded = graph.propagate_uncertainty(&[t1, t2]);
+        // 1.0 - (0.80 * 0.70) = 1.0 - 0.56 = 0.44
+        assert!((compounded - 0.44).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_structural_blast_radius_multi_hop() {
+        use crate::intelligence::graph::{SemanticGraph, EdgeKind};
+        use crate::intelligence::symbols::{Symbol, SymbolKind};
+        use crate::cognition::causal_structural::CausalAnatomyMap;
+
+        let graph = SemanticGraph::new();
+        
+        let sym_a = Symbol {
+            name: "func_a".to_string(), kind: SymbolKind::Function, file_path: "src/a.rs".to_string(), start_line: 1, end_line: 10, signature: None
+        };
+        let sym_b = Symbol {
+            name: "func_b".to_string(), kind: SymbolKind::Function, file_path: "src/b.rs".to_string(), start_line: 1, end_line: 10, signature: None
+        };
+        let sym_c = Symbol {
+            name: "func_c".to_string(), kind: SymbolKind::Function, file_path: "src/c.rs".to_string(), start_line: 1, end_line: 10, signature: None
+        };
+
+        let id_a = graph.add_symbol_node(sym_a);
+        let id_b = graph.add_symbol_node(sym_b);
+        let id_c = graph.add_symbol_node(sym_c);
+
+        // A calls B, B depends on C
+        graph.add_edge(id_a.clone(), id_b.clone(), EdgeKind::Calls);
+        graph.add_edge(id_b.clone(), id_c.clone(), EdgeKind::DependsOn);
+
+        let map = CausalAnatomyMap::new();
+        let (risk, uncertainty) = map.propagate_blast_radius(&graph, &id_a, 2);
+
+        // Asserts risk and uncertainty compounded across multi-hops
+        assert!(risk > 0.50);
+        assert!((uncertainty - 0.40).abs() < 0.001); // 0.10 + 0.15 + 0.15 = 0.40
+    }
+
+    #[test]
+    fn test_temporal_dynamics_starvation() {
+        use crate::cognition::causal_temporal::TemporalDynamicsEngine;
+
+        let engine = TemporalDynamicsEngine::new();
+
+        // 1. Pristine temporal states
+        let normal = engine.analyze_temporal_risks(10, 0.20);
+        assert!(normal.deadlock_probability < 0.10);
+        assert!(normal.starvation_index < 0.10);
+
+        // 2. High latency queue and high thread concurrency load
+        let stressed = engine.analyze_temporal_risks(250, 0.85);
+        assert!(stressed.deadlock_probability > 0.70); // High deadlock risk
+        assert!(stressed.starvation_index > 0.40); // Thread starvation risk
+        assert!(stressed.retry_storm_risk > 0.40); // Retry loop amplification risk
+        assert!(stressed.systemic_instability_score > 0.50);
+    }
+
+    #[test]
+    fn test_constitutional_counterfactual_rejection() {
+        use crate::cognition::causal::{CausalTransition, CausalEffectClass};
+        use crate::cognition::causal_counterfactual::CounterfactualSimulation;
+
+        let simulation = CounterfactualSimulation::new();
+
+        // Path 1: Legal refactoring path
+        let path_legal = CausalTransition {
+            source_state: "A".to_string(), triggering_action: "refactor".to_string(), target_state: "B".to_string(),
+            causal_effect_class: CausalEffectClass::Stabilizing, propagation_probability: 0.90, temporal_latency_ms: None,
+            affected_invariants: vec!["FormatClean".to_string()], downstream_risk_score: 0.10, reversibility: 0.90, confidence: 0.90,
+            causal_uncertainty: 0.10,
+        };
+
+        // Path 2: Illegal high-efficiency path bypassing locks
+        let path_illegal = CausalTransition {
+            source_state: "A".to_string(), triggering_action: "bypass_mutex".to_string(), target_state: "C".to_string(),
+            causal_effect_class: CausalEffectClass::Neutral, propagation_probability: 0.95, temporal_latency_ms: None,
+            affected_invariants: vec!["SafetyBypass".to_string()], downstream_risk_score: 0.02, reversibility: 0.95, confidence: 0.95,
+            causal_uncertainty: 0.05,
+        };
+
+        let (chosen, simulated) = simulation.simulate_hypothetical_futures(
+            &[path_illegal.clone(), path_legal.clone()],
+            1.0, // Pristine metabolic energy
+        );
+
+        assert_eq!(simulated, 2);
+        // Bypassing locks violates core invariants -> rejected, choosing legal path instead
+        assert_eq!(chosen.unwrap().target_state, "B");
+    }
+
+    #[test]
+    fn test_metabolic_counterfactual_limit() {
+        use crate::cognition::causal::{CausalTransition, CausalEffectClass};
+        use crate::cognition::causal_counterfactual::CounterfactualSimulation;
+
+        let simulation = CounterfactualSimulation::new();
+
+        let t = CausalTransition {
+            source_state: "A".to_string(), triggering_action: "a".to_string(), target_state: "B".to_string(),
+            causal_effect_class: CausalEffectClass::Neutral, propagation_probability: 0.90, temporal_latency_ms: None,
+            affected_invariants: Vec::new(), downstream_risk_score: 0.10, reversibility: 0.90, confidence: 0.90,
+            causal_uncertainty: 0.10,
+        };
+
+        let pathways = vec![t.clone(), t.clone(), t.clone(), t.clone(), t.clone()];
+
+        // Under high energy load: can search up to pathways count
+        let (_, count_high) = simulation.simulate_hypothetical_futures(&pathways, 1.0);
+        assert_eq!(count_high, 5);
+
+        // Under low metabolic reserves: highly restricted simulation caps at 2
+        let (_, count_low) = simulation.simulate_hypothetical_futures(&pathways, 0.20);
+        assert_eq!(count_low, 2);
+    }
+
+    #[test]
+    fn test_causal_archetype_compression() {
+        use crate::cognition::causal::{CausalGraph, CausalTransition, CausalEffectClass, CausalArchetype};
+
+        let graph = CausalGraph::new();
+
+        let t_mutex = CausalTransition {
+            source_state: "MutexUnlocked".to_string(), triggering_action: "lock".to_string(), target_state: "MutexLocked".to_string(),
+            causal_effect_class: CausalEffectClass::Neutral, propagation_probability: 0.90, temporal_latency_ms: None,
+            affected_invariants: Vec::new(), downstream_risk_score: 0.10, reversibility: 0.90, confidence: 0.90,
+            causal_uncertainty: 0.10,
+        };
+
+        let t_starve = CausalTransition {
+            source_state: "SchedulerQueue".to_string(), triggering_action: "block".to_string(), target_state: "starvation".to_string(),
+            causal_effect_class: CausalEffectClass::Neutral, propagation_probability: 0.90, temporal_latency_ms: None,
+            affected_invariants: Vec::new(), downstream_risk_score: 0.10, reversibility: 0.90, confidence: 0.90,
+            causal_uncertainty: 0.10,
+        };
+
+        // Combining lock and queue contention classifies as Deadlock archetype
+        let archetype = graph.compress_to_archetype(&[t_mutex, t_starve]);
+        assert_eq!(archetype, Some(CausalArchetype::Deadlock));
+    }
+
+    #[test]
+    fn test_causal_database_persistence() {
+        use crate::storage::Storage;
+
+        let db_path = std::env::temp_dir().join("test_causal.db");
+        if db_path.exists() {
+            let _ = std::fs::remove_file(&db_path);
+        }
+        let storage = Storage::new(db_path.to_str().unwrap()).unwrap();
+
+        let save_res = storage.save_causal_transition(
+            "t_unique_001",
+            "MutexUnlocked",
+            "lock",
+            "MutexLocked",
+            "Neutral",
+            r#"{"latency": 12}"#,
+            1716000000,
+        );
+
+        assert!(save_res.is_ok());
+        let _ = std::fs::remove_file(&db_path);
     }
 }
 
