@@ -61,6 +61,12 @@ pub mod coalition;
 pub mod deliberation;
 pub mod meta_governance;
 pub mod federated_identity;
+pub mod calibration;
+pub mod epistemic_economy;
+pub mod truth_arbitration;
+pub mod forecast_audit;
+pub mod epistemic_governance;
+
 
 
 
@@ -2123,6 +2129,149 @@ mod tests {
         let risk_bad = guard.calculate_fragmentation_risk(&identity_bad, 0.30, 0.20, 0.20);
         let sweep_blocked = guard.is_evolution_sweep_authorized(&identity_bad, risk_bad);
         assert_eq!(sweep_blocked, false);
+    }
+
+    #[test]
+    fn test_brier_score_calibration_audit() {
+        use crate::cognition::calibration::{BrierScore, ForecastRecord, ForecastReliabilityProfile};
+
+        let forecasts = vec![
+            ForecastRecord {
+                prediction_id: "pred_01".to_string(),
+                specialist_id: "Security".to_string(),
+                predicted_probability: 0.90, // Confident
+                actual_outcome: 1.0,        // Correct
+                timestamp: 1716000000,
+            },
+            ForecastRecord {
+                prediction_id: "pred_02".to_string(),
+                specialist_id: "Security".to_string(),
+                predicted_probability: 0.80, // Confident
+                actual_outcome: 0.0,        // Incorrect!
+                timestamp: 1716000000,
+            },
+        ];
+
+        let brier = BrierScore::calculate(&forecasts);
+        // expected: ((0.90 - 1.0)^2 + (0.80 - 0.0)^2) / 2 = (0.01 + 0.64) / 2 = 0.325
+        assert!((brier - 0.325).abs() < 0.001);
+
+        let profile = ForecastReliabilityProfile::evaluate_reliability(&forecasts);
+        assert_eq!(profile.total_forecasts, 2);
+        // expected MAE: (|0.90 - 1.0| + |0.80 - 0.0|) / 2 = (0.10 + 0.80) / 2 = 0.45
+        assert!((profile.mean_absolute_calibration_error - 0.45).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_epistemic_collateral_slashing() {
+        use crate::cognition::epistemic_economy::{EpistemicCapital, ConfidenceCollateral};
+
+        let mut capital = EpistemicCapital::new("Performance", 1.00);
+
+        // 1. Authority decay over long horizons
+        capital.apply_authority_decay(0.10);
+        // expected: 1.00 * 0.90 = 0.90
+        assert!((capital.capital_balance - 0.90).abs() < 0.001);
+
+        // 2. Stake collateral behind high-impact forecast
+        let collateral_opt = ConfidenceCollateral::stake(&mut capital, "stake_01", 0.40, "forecast_01");
+        assert!(collateral_opt.is_some());
+        let collateral = collateral_opt.unwrap();
+        assert!((capital.capital_balance - 0.50).abs() < 0.001);
+
+        // 3. Slashing / Reward resolution
+        // Correct forecast returns collateral + bonus
+        collateral.slash_or_reward(&mut capital, 1.0, 0.80);
+        assert!(capital.capital_balance > 0.90);
+        assert!((capital.reliability_rating - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_truth_arbitration_honesty_bonus() {
+        use crate::cognition::truth_arbitration::{TruthDispute, RealityWeightedVerdict};
+        use std::collections::HashMap;
+
+        let dispute = TruthDispute {
+            dispute_id: "dispute_01".to_string(),
+            contending_domains: vec!["Performance".to_string(), "Security".to_string()],
+            causal_assertions: vec!["bypass locks".to_string(), "hard sync".to_string()],
+        };
+
+        let mut brier_scores = HashMap::new();
+        brier_scores.insert("Performance".to_string(), 0.15); // Low Brier (excellent accuracy)
+        brier_scores.insert("Security".to_string(), 0.45);    // High Brier (miscalibrated overconfidence)
+
+        let mut honesty_indices = HashMap::new();
+        honesty_indices.insert("Performance".to_string(), 0.90); // High calibrated humility
+        honesty_indices.insert("Security".to_string(), 0.30);    // Low honesty
+
+        let verdict = RealityWeightedVerdict::arbitrate_dispute(&dispute, &brier_scores, &honesty_indices);
+        // Performance epistemic power: (1.0 - 0.15) + (0.90 * 0.35) = 0.85 + 0.315 = 1.165
+        // Security epistemic power: (1.0 - 0.45) + (0.30 * 0.35) = 0.55 + 0.105 = 0.655
+        assert_eq!(verdict.winner_domain, "Performance");
+        assert!((verdict.penalty_applied - 0.17).abs() < 0.001); // (1.0 - 0.15) * 0.20 = 0.17
+    }
+
+    #[test]
+    fn test_forecast_drift_inflation_bubbles() {
+        use crate::cognition::forecast_audit::{ForecastDriftIndex, ConfidenceInflationDetector};
+
+        // 1. Long-horizon systemic drift decay curves
+        let drift_index = ForecastDriftIndex::new(0.02, 0.10, 50.0);
+        let decay = drift_index.calculate_calibration_decay(100.0);
+        // expected: 0.10 * 2^(100 / 50) = 0.10 * 4 = 0.40
+        assert!((decay - 0.40).abs() < 0.001);
+
+        // 2. Confidence inflation bubble immunity checks
+        let detector = ConfidenceInflationDetector::new();
+
+        // High confidence (0.90) + Low accuracy (0.40) -> Inflation bubble detected
+        let bubble = detector.detect_inflation_bubble(0.90, 0.40);
+        assert_eq!(bubble, true);
+
+        // Healthy calibrated tracking
+        let healthy = detector.detect_inflation_bubble(0.70, 0.68);
+        assert_eq!(healthy, false);
+    }
+
+    #[test]
+    fn test_confidence_taxation_budgets() {
+        use crate::cognition::epistemic_governance::{ConfidenceTaxation, SpeculationBudget};
+
+        let taxator = ConfidenceTaxation::new();
+        // High confidence (0.90, delta = 0.40) + High impact (2.0) = taxed 0.24
+        let tax = taxator.calculate_tax(0.90, 2.0);
+        // expected: 0.40 * 2.0 * 0.30 = 0.24
+        assert!((tax - 0.24).abs() < 0.001);
+
+        // 2. Speculation budget controls
+        let mut budget = SpeculationBudget::new(1.00);
+        assert_eq!(budget.request_allocation(0.40), true);
+        assert_eq!(budget.request_allocation(0.70), false); // Caps active exposure beyond limit
+    }
+
+    #[test]
+    fn test_epistemic_economy_persistence() {
+        use crate::storage::Storage;
+
+        let db_path = "test_epistemic_persistence.db";
+        let _ = std::fs::remove_file(db_path);
+
+        let storage = Storage::new(db_path).unwrap();
+
+        // 1. Verify epistemic ledger persistence
+        let save_ledger = storage.save_epistemic_ledger("Concurrency", 0.85, 0.90, 1716000000);
+        assert!(save_ledger.is_ok());
+
+        // 2. Verify forecast record persistence
+        let save_forecast = storage.save_forecast_record("forecast_100", "Concurrency", 0.75, 1.0, 1716000000);
+        assert!(save_forecast.is_ok());
+
+        // 3. Verify truth dispute persistence
+        let save_dispute = storage.save_truth_dispute("dispute_200", "Concurrency", 1.20, 0.15, 1716000000);
+        assert!(save_dispute.is_ok());
+
+        let _ = std::fs::remove_file(db_path);
     }
 }
 

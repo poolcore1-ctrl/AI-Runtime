@@ -495,6 +495,38 @@ impl Storage {
             [],
         )?;
 
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cognitive_epistemic_ledgers (
+                specialist_id TEXT PRIMARY KEY,
+                capital_balance REAL NOT NULL,
+                reliability_rating REAL NOT NULL,
+                timestamp INTEGER NOT NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cognitive_forecast_records (
+                prediction_id TEXT PRIMARY KEY,
+                specialist_id TEXT NOT NULL,
+                predicted_probability REAL NOT NULL,
+                actual_outcome REAL NOT NULL,
+                timestamp INTEGER NOT NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cognitive_truth_disputes (
+                dispute_id TEXT PRIMARY KEY,
+                winner_domain TEXT NOT NULL,
+                confidence_margin REAL NOT NULL,
+                penalty_applied REAL NOT NULL,
+                timestamp INTEGER NOT NULL
+            )",
+            [],
+        )?;
+
         Ok(Self { conn: Mutex::new(conn) })
     }
 
@@ -803,6 +835,73 @@ impl Storage {
                 coalition_instability = excluded.coalition_instability,
                 timestamp = excluded.timestamp",
             (epoch_id, treaty_fragmentation, arbitration_pressure, semantic_drift, coalition_instability, timestamp),
+        )?;
+        Ok(())
+    }
+
+    pub fn save_epistemic_ledger(
+        &self,
+        specialist_id: &str,
+        capital_balance: f64,
+        reliability_rating: f64,
+        timestamp: i64,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO cognitive_epistemic_ledgers (
+                specialist_id, capital_balance, reliability_rating, timestamp
+             ) VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(specialist_id) DO UPDATE SET
+                capital_balance = excluded.capital_balance,
+                reliability_rating = excluded.reliability_rating,
+                timestamp = excluded.timestamp",
+            (specialist_id, capital_balance, reliability_rating, timestamp),
+        )?;
+        Ok(())
+    }
+
+    pub fn save_forecast_record(
+        &self,
+        prediction_id: &str,
+        specialist_id: &str,
+        predicted_probability: f64,
+        actual_outcome: f64,
+        timestamp: i64,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO cognitive_forecast_records (
+                prediction_id, specialist_id, predicted_probability, actual_outcome, timestamp
+             ) VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(prediction_id) DO UPDATE SET
+                specialist_id = excluded.specialist_id,
+                predicted_probability = excluded.predicted_probability,
+                actual_outcome = excluded.actual_outcome,
+                timestamp = excluded.timestamp",
+            (prediction_id, specialist_id, predicted_probability, actual_outcome, timestamp),
+        )?;
+        Ok(())
+    }
+
+    pub fn save_truth_dispute(
+        &self,
+        dispute_id: &str,
+        winner_domain: &str,
+        confidence_margin: f64,
+        penalty_applied: f64,
+        timestamp: i64,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO cognitive_truth_disputes (
+                dispute_id, winner_domain, confidence_margin, penalty_applied, timestamp
+             ) VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(dispute_id) DO UPDATE SET
+                winner_domain = excluded.winner_domain,
+                confidence_margin = excluded.confidence_margin,
+                penalty_applied = excluded.penalty_applied,
+                timestamp = excluded.timestamp",
+            (dispute_id, winner_domain, confidence_margin, penalty_applied, timestamp),
         )?;
         Ok(())
     }
