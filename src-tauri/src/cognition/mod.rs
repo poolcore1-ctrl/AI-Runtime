@@ -47,6 +47,11 @@ pub mod causal;
 pub mod causal_structural;
 pub mod causal_temporal;
 pub mod causal_counterfactual;
+pub mod causal_physics;
+pub mod causal_resonance;
+pub mod causal_decay;
+pub mod global_compression;
+
 
 
 
@@ -1620,7 +1625,122 @@ mod tests {
         );
 
         assert!(save_res.is_ok());
+
+        // Test Phase 5.2 SQLite systems physics persistence
+        let save_field = storage.save_systems_field(
+            "field_001",
+            10.5,
+            0.85,
+            r#"{"latency_drift": 140}"#,
+            1716000000,
+        );
+        assert!(save_field.is_ok());
+
+        let save_decay = storage.save_causal_decay_log(
+            "causal_001",
+            0.75,
+            0.15,
+            1716000000,
+        );
+        assert!(save_decay.is_ok());
+
         let _ = std::fs::remove_file(&db_path);
+    }
+
+    #[test]
+    fn test_observable_concurrency_physics_gradient() {
+        use crate::cognition::causal_physics::ConcurrencyField;
+
+        let field = ConcurrencyField::new(15.0, 10.0, 180, 0.85, 0.60);
+        let grad = field.calculate_latent_gradient();
+        
+        // gradient = 15.0 - 10.0 = 5.0
+        assert_eq!(grad.pressure_gradient, 5.0);
+        assert!(grad.instability_index > 0.50);
+
+        let sched = field.estimate_scheduler_instability();
+        assert!(sched.starvation_likelihood > 0.70);
+        assert!(sched.priority_inversion_risk > 0.50);
+
+        let resonance = field.estimate_resonance_pattern();
+        assert_eq!(resonance.synchronization_drift_ms, 108); // 180 * 0.60
+        assert!(resonance.jitter_cascade_risk > 0.30);
+    }
+
+    #[test]
+    fn test_empirical_resonance_feedback_storm() {
+        use crate::cognition::causal_resonance::{ResonanceAmplificationMatrix, SubsystemInterferenceTracker};
+
+        let matrix = ResonanceAmplificationMatrix::new();
+        // Combining two risk values (0.35 + 0.40) under high 30% feedback loop resonance
+        let combined = matrix.calculate_combined_resonance(0.35, 0.40, 0.30);
+        
+        // expected: (0.35 + 0.40) * 1.30 = 0.975
+        assert!((combined - 0.975).abs() < 0.001);
+
+        let mut tracker = SubsystemInterferenceTracker::new();
+        tracker.add_interference(0.20);
+        tracker.add_interference(0.30);
+
+        let cumul = tracker.get_cumulative_interference();
+        // 1.0 - (0.80 * 0.70) = 0.44
+        assert!((cumul - 0.44).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_forecast_confidence_calibration() {
+        use crate::cognition::causal_decay::ForecastCalibrationCurve;
+
+        let mut curve = ForecastCalibrationCurve::new();
+        curve.record_prediction(0.80, 0.85);
+        curve.record_prediction(0.40, 0.30);
+
+        let mae = curve.calculate_calibration_error();
+        // (|0.80 - 0.85| + |0.40 - 0.30|) / 2 = (0.05 + 0.10) / 2 = 0.075
+        assert!((mae - 0.075).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_longitudinal_drift_decay_replay() {
+        use crate::cognition::causal_decay::{LongitudinalDecayTracker, CausalValidationReplay};
+
+        let tracker = LongitudinalDecayTracker::new();
+        // Decay 0.80 initial confidence over 1000 seconds with 1000 half-life (1 half-life elapsed) -> 0.40
+        let decayed = tracker.calculate_longitudinal_decay(0.80, 1000, 1000);
+        assert!((decayed - 0.40).abs() < 0.001);
+
+        let replay = CausalValidationReplay::new();
+        let delta = replay.calculate_forecast_reality_delta(150, 100);
+        // |150 - 100| / 150 = 50 / 150 = 0.3333
+        assert!((delta - 0.3333).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_hierarchical_signal_reduction() {
+        use crate::cognition::global_compression::GlobalCognitiveSignalCompressor;
+
+        let compressor = GlobalCognitiveSignalCompressor::new();
+        let state = compressor.compress_signals(0.80, 0.70, 0.10);
+
+        // composite = (0.80 * 0.40) + (0.70 * 0.40) + (0.10 * 0.20) = 0.32 + 0.28 + 0.02 = 0.62
+        assert!((state.composite_instability - 0.62).abs() < 0.001);
+        assert_eq!(state.is_system_stable, true); // < 0.65 threshold
+    }
+
+    #[test]
+    fn test_stability_arbitrator_loop_decoupling() {
+        use crate::cognition::global_compression::StabilityArbitrator;
+
+        let arbitrator = StabilityArbitrator::new();
+
+        // 1. High cognitive entropy overrides all
+        assert_eq!(arbitrator.arbitrate_regulators(0.20, 0.10, 0.85), "Quarantine");
+
+        // 2. High fatigue and recovery loops sleep
+        assert_eq!(arbitrator.arbitrate_regulators(0.80, 0.60, 0.30), "Sleep");
+
+        // 3. Normal adaptability
+        assert_eq!(arbitrator.arbitrate_regulators(0.10, 0.20, 0.20), "Adapt");
     }
 }
 

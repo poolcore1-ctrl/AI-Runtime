@@ -417,6 +417,27 @@ impl Storage {
             [],
         )?;
 
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cognitive_systems_fields (
+                field_id TEXT PRIMARY KEY,
+                pressure_gradient REAL NOT NULL,
+                instability_index REAL NOT NULL,
+                stats_json TEXT NOT NULL,
+                timestamp INTEGER NOT NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cognitive_causal_decay_log (
+                causal_id TEXT PRIMARY KEY,
+                expected_confidence REAL NOT NULL,
+                reality_delta REAL NOT NULL,
+                timestamp INTEGER NOT NULL
+            )",
+            [],
+        )?;
+
         Ok(Self { conn: Mutex::new(conn) })
     }
 
@@ -562,6 +583,50 @@ impl Storage {
                 stats_json = excluded.stats_json,
                 timestamp = excluded.timestamp",
             (transition_id, source_state, triggering_action, target_state, causal_effect_class, stats_json, timestamp),
+        )?;
+        Ok(())
+    }
+
+    pub fn save_systems_field(
+        &self,
+        field_id: &str,
+        pressure_gradient: f64,
+        instability_index: f64,
+        stats_json: &str,
+        timestamp: i64,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO cognitive_systems_fields (
+                field_id, pressure_gradient, instability_index, stats_json, timestamp
+             ) VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(field_id) DO UPDATE SET
+                pressure_gradient = excluded.pressure_gradient,
+                instability_index = excluded.instability_index,
+                stats_json = excluded.stats_json,
+                timestamp = excluded.timestamp",
+            (field_id, pressure_gradient, instability_index, stats_json, timestamp),
+        )?;
+        Ok(())
+    }
+
+    pub fn save_causal_decay_log(
+        &self,
+        causal_id: &str,
+        expected_confidence: f64,
+        reality_delta: f64,
+        timestamp: i64,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO cognitive_causal_decay_log (
+                causal_id, expected_confidence, reality_delta, timestamp
+             ) VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(causal_id) DO UPDATE SET
+                expected_confidence = excluded.expected_confidence,
+                reality_delta = excluded.reality_delta,
+                timestamp = excluded.timestamp",
+            (causal_id, expected_confidence, reality_delta, timestamp),
         )?;
         Ok(())
     }
