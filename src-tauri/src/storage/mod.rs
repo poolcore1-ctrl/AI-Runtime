@@ -462,6 +462,39 @@ impl Storage {
             [],
         )?;
 
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cognitive_semantic_frames (
+                concept_id TEXT PRIMARY KEY,
+                canonical_meaning TEXT NOT NULL,
+                divergence_score REAL NOT NULL,
+                timestamp INTEGER NOT NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cognitive_reputation_records (
+                record_id TEXT PRIMARY KEY,
+                specialist_id TEXT NOT NULL,
+                domain_context TEXT NOT NULL,
+                trust_score REAL NOT NULL,
+                timestamp INTEGER NOT NULL
+            )",
+            [],
+        )?;
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS cognitive_governance_entropy_log (
+                epoch_id TEXT PRIMARY KEY,
+                treaty_fragmentation REAL NOT NULL,
+                arbitration_pressure REAL NOT NULL,
+                semantic_drift REAL NOT NULL,
+                coalition_instability REAL NOT NULL,
+                timestamp INTEGER NOT NULL
+            )",
+            [],
+        )?;
+
         Ok(Self { conn: Mutex::new(conn) })
     }
 
@@ -701,6 +734,75 @@ impl Storage {
                 terms_json = excluded.terms_json,
                 timestamp = excluded.timestamp",
             (treaty_id, party_a, party_b, trust_score, terms_json, timestamp),
+        )?;
+        Ok(())
+    }
+
+    pub fn save_semantic_frame(
+        &self,
+        concept_id: &str,
+        canonical_meaning: &str,
+        divergence_score: f64,
+        timestamp: i64,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO cognitive_semantic_frames (
+                concept_id, canonical_meaning, divergence_score, timestamp
+             ) VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(concept_id) DO UPDATE SET
+                canonical_meaning = excluded.canonical_meaning,
+                divergence_score = excluded.divergence_score,
+                timestamp = excluded.timestamp",
+            (concept_id, canonical_meaning, divergence_score, timestamp),
+        )?;
+        Ok(())
+    }
+
+    pub fn save_reputation_record(
+        &self,
+        record_id: &str,
+        specialist_id: &str,
+        domain_context: &str,
+        trust_score: f64,
+        timestamp: i64,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO cognitive_reputation_records (
+                record_id, specialist_id, domain_context, trust_score, timestamp
+             ) VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(record_id) DO UPDATE SET
+                specialist_id = excluded.specialist_id,
+                domain_context = excluded.domain_context,
+                trust_score = excluded.trust_score,
+                timestamp = excluded.timestamp",
+            (record_id, specialist_id, domain_context, trust_score, timestamp),
+        )?;
+        Ok(())
+    }
+
+    pub fn save_governance_entropy_log(
+        &self,
+        epoch_id: &str,
+        treaty_fragmentation: f64,
+        arbitration_pressure: f64,
+        semantic_drift: f64,
+        coalition_instability: f64,
+        timestamp: i64,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO cognitive_governance_entropy_log (
+                epoch_id, treaty_fragmentation, arbitration_pressure, semantic_drift, coalition_instability, timestamp
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT(epoch_id) DO UPDATE SET
+                treaty_fragmentation = excluded.treaty_fragmentation,
+                arbitration_pressure = excluded.arbitration_pressure,
+                semantic_drift = excluded.semantic_drift,
+                coalition_instability = excluded.coalition_instability,
+                timestamp = excluded.timestamp",
+            (epoch_id, treaty_fragmentation, arbitration_pressure, semantic_drift, coalition_instability, timestamp),
         )?;
         Ok(())
     }

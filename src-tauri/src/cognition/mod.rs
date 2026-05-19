@@ -55,6 +55,13 @@ pub mod specialist;
 pub mod treaty;
 pub mod consensus_mesh;
 pub mod federation;
+pub mod coherence_mesh;
+pub mod treaty_memory;
+pub mod coalition;
+pub mod deliberation;
+pub mod meta_governance;
+pub mod federated_identity;
+
 
 
 
@@ -1898,6 +1905,224 @@ mod tests {
         assert!(save_treaty.is_ok());
 
         let _ = std::fs::remove_file(&db_path);
+    }
+
+    #[test]
+    fn test_semantic_drift_decay_factor() {
+        use crate::cognition::coherence_mesh::{SemanticDriftDetector, SharedSemanticFrame, SemanticPerspective};
+        use crate::cognition::specialist::SpecialistDomain;
+
+        let detector = SemanticDriftDetector::new(0.05); // 5% decay rate
+        let frame = SharedSemanticFrame {
+            concept_id: "safety_boundary".to_string(),
+            canonical_meaning: "Strict bounds check".to_string(),
+            perspectives: vec![
+                SemanticPerspective {
+                    specialist: SpecialistDomain::Security,
+                    local_interpretation: "verified safe".to_string(),
+                    weight: 1.0,
+                },
+                SemanticPerspective {
+                    specialist: SpecialistDomain::Performance,
+                    local_interpretation: "optimistic check".to_string(),
+                    weight: 0.60,
+                },
+            ],
+            divergence_score: 0.20,
+        };
+
+        let initial_drift = detector.evaluate_concept_divergence(&frame);
+        assert!((initial_drift - 0.20).abs() < 0.001);
+
+        // Apply temporal decay over 10 epochs
+        let drifted = detector.calculate_temporal_drift(initial_drift, 10.0);
+        // expected: 0.20 * (1.0 + 0.05 * 10) = 0.30
+        assert!((drifted - 0.30).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_contextual_trust_memory() {
+        use crate::cognition::treaty_memory::{ReputationEngine, TreatyInteractionRecord};
+        use crate::cognition::specialist::SpecialistDomain;
+
+        let mut engine = ReputationEngine::new(0.80);
+
+        let record_good = TreatyInteractionRecord {
+            participants: vec![SpecialistDomain::Performance, SpecialistDomain::Concurrency],
+            action: "Optimize mutex locking".to_string(),
+            treaty_compliance_score: 0.90, // Highly compliant
+            long_term_outcome: 0.80,
+            timestamp: 1716000000,
+        };
+
+        engine.record_interaction(&record_good, "ConcurrencyScheduling");
+
+        // Trust increases in Concurrency context
+        assert!(engine.get_contextual_trust("ConcurrencyScheduling") > 0.80);
+
+        let record_bad = TreatyInteractionRecord {
+            participants: vec![SpecialistDomain::Performance, SpecialistDomain::Security],
+            action: "Bypass allocations".to_string(),
+            treaty_compliance_score: 0.10, // Compliant breach!
+            long_term_outcome: 0.20,
+            timestamp: 1716000000,
+        };
+
+        engine.record_interaction(&record_bad, "SecurityVerification");
+
+        // Trust in Security context drops dramatically while Concurrency context remains high
+        assert!(engine.get_contextual_trust("SecurityVerification") < 0.80);
+        assert!(engine.get_contextual_trust("ConcurrencyScheduling") > 0.80);
+    }
+
+    #[test]
+    fn test_coalition_intent_entropy_checks() {
+        use crate::cognition::coalition::{AntiCorruptionScanner, CoalitionEdge};
+        use crate::cognition::specialist::SpecialistDomain;
+
+        let scanner = AntiCorruptionScanner::new();
+
+        // 1. Diverse evidence lineages -> high Shannon entropy
+        let diverse_lineages = vec![
+            "hash_perf_01".to_string(),
+            "hash_sec_02".to_string(),
+            "hash_concur_03".to_string(),
+        ];
+        let entropy_high = scanner.calculate_intent_entropy(&diverse_lineages);
+        assert!(entropy_high > 1.50);
+
+        // 2. Monoculture evidence lineages -> low Shannon entropy (loss of epistemic diversity)
+        let monoculture_lineages = vec![
+            "hash_perf_01".to_string(),
+            "hash_perf_01".to_string(),
+            "hash_perf_01".to_string(),
+        ];
+        let entropy_low = scanner.calculate_intent_entropy(&monoculture_lineages);
+        assert_eq!(entropy_low, 0.0);
+
+        // 3. Coalition capture evaluation
+        let edges = vec![
+            CoalitionEdge {
+                source: SpecialistDomain::Performance,
+                target: SpecialistDomain::Compiler,
+                influence_strength: 0.90,
+                dependency_correlation: 0.85,
+                coordinated_drift_score: 0.95,
+            }
+        ];
+
+        // Triggers capture due to low reasoning entropy
+        let captured = scanner.evaluate_coalition_capture(&edges, entropy_low);
+        assert_eq!(captured, true);
+
+        // Blocks capture due to high reasoning diversity
+        let not_captured = scanner.evaluate_coalition_capture(&edges, entropy_high);
+        assert_eq!(not_captured, false);
+    }
+
+    #[test]
+    fn test_epistemic_revision_resistance() {
+        use crate::cognition::deliberation::{DeliberationMesh, DeliberationNode};
+        use crate::cognition::specialist::SpecialistDomain;
+
+        let mesh = DeliberationMesh::new(0.50); // 50% revision cost
+
+        let node_perf = DeliberationNode {
+            specialist: SpecialistDomain::Performance,
+            proposal: "Loosen allocation bounds".to_string(),
+            supporting_evidence: vec!["trace_01".to_string()],
+            constitutional_alignment: 0.70,
+            projected_outcome: 0.85,
+        };
+
+        // 1. Revision is cheap for low cost, but delta = 0.40 triggers rejection due to cost friction
+        let (approved, _) = mesh.evaluate_proposal_revision(&node_perf, 0.40);
+        // expected revision cost: 0.40 * 0.50 * 1.0 (Performance cost) = 0.20
+        // net utility: 0.85 - 0.20 = 0.65 < constitutional_alignment (0.70)
+        assert_eq!(approved, false);
+
+        // 2. Rejection scales further for Security due to double asymmetric cost factor
+        let node_sec = DeliberationNode {
+            specialist: SpecialistDomain::Security,
+            proposal: "Hard lock everything".to_string(),
+            supporting_evidence: vec!["trace_02".to_string()],
+            constitutional_alignment: 0.70,
+            projected_outcome: 0.85,
+        };
+        let (sec_approved, _) = mesh.evaluate_proposal_revision(&node_sec, 0.20);
+        // expected revision cost: 0.20 * 0.50 * 2.0 (Security cost) = 0.20
+        // net utility: 0.85 - 0.20 = 0.65 < 0.70
+        assert_eq!(sec_approved, false);
+    }
+
+    #[test]
+    fn test_meta_governance_energy_limits_and_emergency_path() {
+        use crate::cognition::meta_governance::{MetaGovernanceValidator, GovernanceEntropy};
+
+        let mut validator = MetaGovernanceValidator::new(
+            0.10, // energy cost
+            10,   // max rounds
+            5,    // max recursion
+            3,    // cooldown epochs
+        );
+
+        let entropy_bad = GovernanceEntropy {
+            treaty_fragmentation: 0.40,
+            arbitration_pressure: 0.30,
+            semantic_divergence: 0.20,
+            coalition_instability: 0.10,
+        };
+
+        // 1. Allowed rounds scale down based on fragmentation to protect against recursive deadlocks
+        let allowed = validator.assess_bureaucratic_limit(&entropy_bad);
+        // expected allowed rounds: 10 * (1.0 - 0.40) = 6
+        assert_eq!(allowed, 6);
+
+        // 2. Emergency Fast Path triggers secure lockdown instantly, generating post-emergency audit and cooling hysteresis
+        let audit = validator.trigger_emergency_fast_path("existential_threat_01", 1.0);
+        assert_eq!(audit.trigger_cause, "existential_threat_01");
+        assert_eq!(validator.active_cooldown_epochs, 3);
+        assert!((audit.energy_state - 0.90).abs() < 0.001);
+
+        // 3. Cooldown ticks down correctly
+        validator.tick_cooldown();
+        assert_eq!(validator.active_cooldown_epochs, 2);
+    }
+
+    #[test]
+    fn test_multidimensional_identity_preservation() {
+        use crate::cognition::federated_identity::{IdentityPreservationGuard, FederatedIdentityVector};
+
+        let guard = IdentityPreservationGuard::new();
+
+        // 1. High overlap multi-axis coherence
+        let identity_good = FederatedIdentityVector {
+            constitutional_overlap: 0.95,
+            ontological_overlap: 0.90,
+            ethical_overlap: 0.85,
+            operational_overlap: 0.80,
+            semantic_overlap: 0.90,
+        };
+
+        let risk = guard.calculate_fragmentation_risk(&identity_good, 0.10, 0.05, 0.05);
+        // expected: (0.05 * 0.35) + (0.10 * 0.15) + (0.10 * 0.20) + (0.05 * 0.15) + (0.05 * 0.15) = 0.0675
+        assert!(risk < 0.10);
+
+        let sweep_ok = guard.is_evolution_sweep_authorized(&identity_good, risk);
+        assert_eq!(sweep_ok, true);
+
+        // 2. Fragmented overlap blocks evolution sweep (e.g. constitutional drops to 0.60)
+        let identity_bad = FederatedIdentityVector {
+            constitutional_overlap: 0.60,
+            ontological_overlap: 0.90,
+            ethical_overlap: 0.85,
+            operational_overlap: 0.80,
+            semantic_overlap: 0.90,
+        };
+
+        let risk_bad = guard.calculate_fragmentation_risk(&identity_bad, 0.30, 0.20, 0.20);
+        let sweep_blocked = guard.is_evolution_sweep_authorized(&identity_bad, risk_bad);
+        assert_eq!(sweep_blocked, false);
     }
 }
 
